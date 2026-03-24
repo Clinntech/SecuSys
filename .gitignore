@@ -1,0 +1,14 @@
+# Python Environment
+venv/
+__pycache__/
+*.pyc
+
+# Project Audit Reports (Keep your personal test results private)
+scan_report_*.txt
+
+# VS Code Personal Settings
+.vscode/
+
+# System Files
+Thumbs.db
+.DS_Store

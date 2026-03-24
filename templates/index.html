@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecuSys: Unified Audit Dashboard</title>
+    <style>
+        /* Modern Dark Cyber-Theme */
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, sans-serif; padding: 40px; line-height: 1.6; margin: 0;}
+        .container { max-width: 950px; margin: auto; }
+        
+        /* Header & Logo Section */
+        .dashboard-header { border-bottom: 1px solid #30363d; margin-bottom: 30px; padding-bottom: 20px; display: flex; justify-content: space-between; align-items: baseline; }
+        h1 { color: #58a6ff; font-weight: 600; margin: 0;}
+        .version-tag { color: #8b949e; font-size: 0.8em; font-family: monospace; }
+
+        /* The Insights (Audit Count) Bar */
+        .status-feed { background: rgba(88, 166, 255, 0.1); border: 1px solid #58a6ff; padding: 15px; border-radius: 8px; margin-bottom: 30px; color: #58a6ff; font-weight: 500;}
+        
+        /* Form & Control Area */
+        .control-panel { background: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 30px; }
+        .input-group { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        
+        input[type="text"], input[type="number"], select { padding: 12px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; flex-grow: 1;}
+        input[type="number"] { max-width: 150px; }
+        
+        button { padding: 12px 30px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.3s; }
+        button:hover { background: #2ea043; }
+
+        /* Result Visuals */
+        .result-info { display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #238636; padding-left: 15px; margin-bottom: 15px;}
+        .download-btn { color: #58a6ff; text-decoration: none; border: 1px solid #58a6ff; padding: 6px 12px; border-radius: 5px; font-size: 0.85em; }
+        .download-btn:hover { background: #58a6ff; color: white; }
+
+        .analysis-box { background: #010409; border: 1px solid #30363d; border-radius: 6px; padding: 20px; margin-bottom: 20px; font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; color: #d1d5db; font-size: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);}
+
+        /* JavaScript Toggled Area */
+        #custom-fields { display: none; margin-top: 15px; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <h1>SecuSys Dashboard <span class="version-tag">PROT-v3.2</span></h1>
+        </div>
+
+        <!-- SAAS AUDIT COUNTER (Pulling from DB) -->
+        <div class="status-feed">
+            📡 SECUSYS METRICS: <strong>{{ audit_count }}</strong> system-wide audits verified and stored in permanent scan history.
+        </div>
+
+        <div class="control-panel">
+            <form action="/scan" method="post">
+                <div class="input-group">
+                    <input type="text" name="target_ip" placeholder="Network Target (e.g., 127.0.0.1)" required>
+                    
+                    <select name="scan_type" id="scan_mode" onchange="toggleCustomPorts()">
+                        <option value="common">Common Service Audit</option>
+                        <option value="well-known">Well-Known Range (1-1024)</option>
+                        <option value="test">Rapid Port Discovery</option>
+                        <option value="custom">Advanced: Custom Range</option>
+                    </select>
+
+                    <button type="submit">Execute Audit</button>
+                </div>
+
+                <div id="custom-fields" class="input-group">
+                    <input type="number" name="start_port" placeholder="Start Port">
+                    <input type="number" name="end_port" placeholder="End Port">
+                </div>
+            </form>
+        </div>
+
+        {% if target %}
+            <div class="result-info">
+                <h2>Target Profile: {{ target }}</h2>
+                {% if results %}
+                    <a href="/download" class="download-btn">📂 Save as .TXT Record</a>
+                {% endif %}
+            </div>
+
+            {% if results %}
+                {% for entry in results %}
+                    <div class="analysis-box">{{ entry }}</div>
+                {% endfor %}
+            {% else %}
+                <div class="analysis-box" style="color: #ff7b72;">
+                    [-] SECURITY EVENT: Scan complete for {{ target }}. No responsive services identified in chosen range.
+                </div>
+            {% endif %}
+        {% endif %}
+
+    </div>
+
+    <script>
+        // Visual Logic for SaaS Dashboard
+        function toggleCustomPorts() {
+            var mode = document.getElementById("scan_mode").value;
+            var customArea = document.getElementById("custom-fields");
+            if (mode === "custom") {
+                customArea.style.display = "flex";
+            } else {
+                customArea.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>
