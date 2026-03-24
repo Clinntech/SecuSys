@@ -70,6 +70,44 @@
                     <input type="number" name="end_port" placeholder="End Port">
                 </div>
             </form>
+            <div style="margin-top: 60px; border-top: 1px solid #30363d; padding-top: 40px;">
+                <h3 style="color: #8b949e; font-size: 1rem; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 20px;"> Recent Forensic Logs</h3>
+                <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead style="background: #21262d; font-size: 0.8em; color: #8b949e;">
+                        <tr>
+                            <th style="padding: 12px 20px;">TIMESTAMP</th>
+                            <th style="padding: 12px 20px;">TARGET INFRASTRUCTURE</th>
+                            <th style="padding: 12px 20px;">RISK SUMMARY</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for audit in history %}
+                        <tr style="border-bottom: 1px solid #30363d; transition: background 0.3s;">
+                            <td style="padding: 15px 20px; color: #8b949e; font-size: 0.85em;">
+                                {{ audit.scan_date.strftime('%Y-%m-%d %H:%M') }}
+                            </td>
+                            <td style="padding: 15px 20px; font-family: monospace; font-weight: bold; color: #58a6ff;">
+                                {{ audit.target_ip }}
+                            </td>
+                            <td style="padding: 15px 20px; font-size: 0.9em;">
+                                <span style="background: rgba(35, 134, 54, 0.1); border: 1px solid #238636; color: #2ea043; padding: 2px 8px; border-radius: 4px;">
+                                    {{ audit.threat_summary }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                {% if not history %}
+                <div style="padding: 30px; text-align: center; color: #8b949e;">
+                    <em>System waiting for initial audit...</em>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+            </div>
         </div>
 
         {% if target %}

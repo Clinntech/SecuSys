@@ -29,7 +29,7 @@ class AuditRecord(db.Model):
     #Store risk level value
     threat_summary = db.Column(db.Text)
 
-    def __rerp__(self):
+    def __repr__(self):
         return f'<Audit {self.target_ip} on {self.scan_date}>'
     
 
@@ -43,7 +43,10 @@ def index():
     #Shows starting page
     #Fetch the total number of audits from the database
     total_audits = AuditRecord.query.count()
-    return render_template('index.html', audit_count = total_audits)
+    # NEW UPDATED LOGIC: Pull recent history from the database to fill the UI table
+    history_logs = AuditRecord.query.order_by(AuditRecord.scan_date.desc()).limit(5).all()
+    
+    return render_template('index.html', audit_count = total_audits, history = history_logs)
 
 @app.route('/scan' , methods=['POST'])
 def scan():
@@ -120,8 +123,12 @@ def scan():
         db.session.rollback() #cancels the save if there's an error
         print (f"[DATABASE ERROR] Could not save audit: {e}")    
 
+    # NEW UPDATED LOGIC: Re-calculate counts and history so UI updates immediately after scan
+    total_audits = AuditRecord.query.count()
+    history_logs = AuditRecord.query.order_by(AuditRecord.scan_date.desc()).limit(5).all()
 
-    return render_template('index.html', results=results, target=target)
+    # ADDED 'audit_count' and 'history' to the template return
+    return render_template('index.html', results=results, target=target, audit_count=total_audits, history=history_logs)
 
 #The Download Route
 @app.route('/download')
