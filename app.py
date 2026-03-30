@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor #multithreading
 from flask import Flask, render_template, request, send_file
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -86,13 +87,23 @@ def scan():
         ip = socket.gethostbyname(target)
         last_scanned_ip = ip # Save this globally for the download route
 
-        for port in ports_to_scan:
-            #Calls main.py scan_port function
-            if scan_port(ip, port): 
-                # Calls main.py logic to create the box
-                analysis = generate_analysis(port)
-                # Adds the box to the results list
-                results.append(analysis)
+        #Speed
+        #1. Small helper funtion for threads to use
+        def thread_scan(port):
+            if scan_port(ip,port):
+                return generate_analysis(port)
+            return None
+        
+        #2. ThreadPoolExecutor, run scan in parallel
+        # max_workers = 20, ports are scanned at once.
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            #map helper function to every port
+            thread_results = executor.map(thread_scan, ports_to_scan)
+
+        #3. Collect findings that aren't none
+        results = [r for r in thread_results if r is not None]
+
+
          #Save to Hard Drive, Creates the .txt file in the background
         if results:
             save_report_to_file(ip, results)
