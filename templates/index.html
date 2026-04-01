@@ -3,144 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecuSys: Unified Audit Dashboard</title>
+    <title>SecuSys Dashboard</title>
     <style>
-        /* Modern Dark Cyber-Theme */
-        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, sans-serif; padding: 40px; line-height: 1.6; margin: 0;}
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, sans-serif; padding: 40px; margin: 0; line-height: 1.6;}
         .container { max-width: 950px; margin: auto; }
-        
-        /* Header & Logo Section */
-        .dashboard-header { border-bottom: 1px solid #30363d; margin-bottom: 30px; padding-bottom: 20px; display: flex; justify-content: space-between; align-items: baseline; }
-        h1 { color: #58a6ff; font-weight: 600; margin: 0;}
-        .version-tag { color: #8b949e; font-size: 0.8em; font-family: monospace; }
-
-        /* The Insights (Audit Count) Bar */
-        .status-feed { background: rgba(88, 166, 255, 0.1); border: 1px solid #58a6ff; padding: 15px; border-radius: 8px; margin-bottom: 30px; color: #58a6ff; font-weight: 500;}
-        
-        /* Form & Control Area */
+        h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 15px; }
+        .status-feed { background: rgba(88, 166, 255, 0.1); border: 1px solid #58a6ff; padding: 15px; border-radius: 8px; margin-bottom: 30px; font-weight: bold; }
         .control-panel { background: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 30px; }
-        .input-group { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
-        
-        input[type="text"], input[type="number"], select { padding: 12px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; flex-grow: 1;}
-        input[type="number"] { max-width: 150px; }
-        
-        button { padding: 12px 30px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.3s; }
-        button:hover { background: #2ea043; }
-
-        /* Result Visuals */
-        .result-info { display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #238636; padding-left: 15px; margin-bottom: 15px;}
-        .download-btn { color: #58a6ff; text-decoration: none; border: 1px solid #58a6ff; padding: 6px 12px; border-radius: 5px; font-size: 0.85em; }
-        .download-btn:hover { background: #58a6ff; color: white; }
-
-        .analysis-box { background: #010409; border: 1px solid #30363d; border-radius: 6px; padding: 20px; margin-bottom: 20px; font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; color: #d1d5db; font-size: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);}
-
-        /* JavaScript Toggled Area */
-        #custom-fields { display: none; margin-top: 15px; width: 100%; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        input, select { padding: 12px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; flex: 1; min-width: 200px;}
+        button { padding: 12px 30px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .result-box { background: #010409; border: 1px solid #30363d; padding: 20px; border-radius: 6px; margin-top: 15px; white-space: pre-wrap; font-family: monospace; font-size: 13px; }
+        #custom-fields { display: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #161b22; }
+        th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid #30363d; }
+        th { background: #21262d; color: #8b949e; font-size: 0.8em; text-transform: uppercase; }
     </style>
 </head>
 <body>
-
     <div class="container">
-        <div class="dashboard-header">
-            <h1>SecuSys Dashboard <span class="version-tag">PROT-v3.2</span></h1>
-        </div>
-
-        <!-- SAAS AUDIT COUNTER (Pulling from DB) -->
+        <h1>SecuSys Dashboard <span style="font-size: 0.4em; color: #8b949e;">PROT-v3.2</span></h1>
+        
         <div class="status-feed">
-            📡 SECUSYS METRICS: <strong>{{ audit_count }}</strong> system-wide audits verified and stored in permanent scan history.
+            📡 SECUSYS METRICS: <strong>{{ audit_count }}</strong> professional audits recorded in local encrypted history.
         </div>
 
         <div class="control-panel">
             <form action="/scan" method="post">
                 <div class="input-group">
-                    <input type="text" name="target_ip" placeholder="Network Target (e.g., 127.0.0.1)" required>
-                    
-                    <select name="scan_type" id="scan_mode" onchange="toggleCustomPorts()">
+                    <input type="text" name="target_ip" placeholder="Audit Target (e.g. 127.0.0.1)" required>
+                    <select name="scan_type" id="scan_mode" onchange="togglePorts()">
+                        <option value="test">Rapid Discovery</option>
                         <option value="common">Common Service Audit</option>
                         <option value="well-known">Well-Known Range (1-1024)</option>
-                        <option value="test">Rapid Port Discovery</option>
-                        <option value="custom">Advanced: Custom Range</option>
+                        <option value="custom">Advanced Custom Range</option>
                     </select>
-
                     <button type="submit">Execute Audit</button>
                 </div>
-
                 <div id="custom-fields" class="input-group">
-                    <input type="number" name="start_port" placeholder="Start Port">
-                    <input type="number" name="end_port" placeholder="End Port">
+                    <input type="number" name="start_port" placeholder="Start">
+                    <input type="number" name="end_port" placeholder="End">
                 </div>
             </form>
-            <div style="margin-top: 60px; border-top: 1px solid #30363d; padding-top: 40px;">
-                <h3 style="color: #8b949e; font-size: 1rem; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 20px;"> Recent Forensic Logs</h3>
-                <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden;">
-                <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                    <thead style="background: #21262d; font-size: 0.8em; color: #8b949e;">
-                        <tr>
-                            <th style="padding: 12px 20px;">TIMESTAMP</th>
-                            <th style="padding: 12px 20px;">TARGET INFRASTRUCTURE</th>
-                            <th style="padding: 12px 20px;">RISK SUMMARY</th>
-                        </tr>
+        </div>
+
+        <div style="margin-top: 50px;">
+            <h3>📋 Recent Forensic Logs</h3>
+            <div style="border: 1px solid #30363d; border-radius: 8px; overflow: hidden;">
+                <table>
+                    <thead>
+                        <tr><th>TIMESTAMP</th><th>TARGET INFRASTRUCTURE</th><th>RISK SUMMARY</th></tr>
                     </thead>
                     <tbody>
                         {% for audit in history %}
-                        <tr style="border-bottom: 1px solid #30363d; transition: background 0.3s;">
-                            <td style="padding: 15px 20px; color: #8b949e; font-size: 0.85em;">
-                                {{ audit.scan_date.strftime('%Y-%m-%d %H:%M') }}
-                            </td>
-                            <td style="padding: 15px 20px; font-family: monospace; font-weight: bold; color: #58a6ff;">
-                                {{ audit.target_ip }}
-                            </td>
-                            <td style="padding: 15px 20px; font-size: 0.9em;">
-                                <span style="background: rgba(35, 134, 54, 0.1); border: 1px solid #238636; color: #2ea043; padding: 2px 8px; border-radius: 4px;">
-                                    {{ audit.threat_summary }}
-                                </span>
-                            </td>
+                        <tr>
+                            <td>{{ audit.scan_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td style="color: #58a6ff; font-family: monospace;">{{ audit.target_ip }}</td>
+                            <td><span style="border: 1px solid #238636; padding: 2px 6px; border-radius: 4px;">{{ audit.threat_summary }}</span></td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-                
                 {% if not history %}
-                <div style="padding: 30px; text-align: center; color: #8b949e;">
-                    <em>System waiting for initial audit...</em>
-                </div>
+                <p style="text-align: center; padding: 20px;"><em>System standby. No previous logs found.</em></p>
                 {% endif %}
-            </div>
-        </div>
             </div>
         </div>
 
         {% if target %}
-            <div class="result-info">
-                <h2>Target Profile: {{ target }}</h2>
-                {% if results %}
-                    <a href="/download" class="download-btn">📂 Save as .TXT Record</a>
-                {% endif %}
-            </div>
-
-            {% if results %}
-                {% for entry in results %}
-                    <div class="analysis-box">{{ entry }}</div>
-                {% endfor %}
-            {% else %}
-                <div class="analysis-box" style="color: #ff7b72;">
-                    [-] SECURITY EVENT: Scan complete for {{ target }}. No responsive services identified in chosen range.
-                </div>
+            <h2 style="margin-top: 40px;">Results for {{ target }} 
+                {% if results %}<a href="/download" style="font-size: 0.6em; color: #58a6ff;">[Download TXT Audit]</a>{% endif %}
+            </h2>
+            {% for report in results %}
+                <div class="result-box">{{ report }}</div>
+            {% endfor %}
+            {% if not results %}
+                <div class="result-box" style="color: #ff7b72;">No responsive services identified. Target is secured.</div>
             {% endif %}
         {% endif %}
-
     </div>
 
     <script>
-        // Visual Logic for SaaS Dashboard
-        function toggleCustomPorts() {
+        function togglePorts() {
             var mode = document.getElementById("scan_mode").value;
-            var customArea = document.getElementById("custom-fields");
-            if (mode === "custom") {
-                customArea.style.display = "flex";
-            } else {
-                customArea.style.display = "none";
-            }
+            document.getElementById("custom-fields").style.display = mode === "custom" ? "flex" : "none";
         }
     </script>
 </body>

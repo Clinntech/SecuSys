@@ -16,6 +16,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'se
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
 # --- NEW: SCAN HISTORY MODEL ---
 # This is a 'Table' that will store every audit SecuSys ever does
 class AuditRecord(db.Model):
@@ -24,7 +25,6 @@ class AuditRecord(db.Model):
     scan_date = db.Column(db.DateTime, default=datetime.utcnow)
 
     #store ports found as strings, "80,22,443"
-
     ports_found = db.Column(db.String(500))
 
     #Store risk level value
@@ -32,8 +32,19 @@ class AuditRecord(db.Model):
 
     def __repr__(self):
         return f'<Audit {self.target_ip} on {self.scan_date}>'
-    
 
+# --- NEW: VULNERABILITY INTELLIGENCE MODEL ---
+class Vulnerability(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    port = db.Column(db.Integer, unique=True, nullable=False)
+    service = db.Column(db.String(50))
+    risk = db.Column(db.String(20))
+    description = db.Column(db.Text)
+    fix = db.Column(db.Text)
+    cisco_acl = db.Column(db.Text)
+
+    def __repr__(self):
+       return f'<Knowledge Base Port {self.port}>'
 
 #remember last scanned IP for download button
 last_scanned_ip = ""
@@ -52,35 +63,26 @@ def index():
 @app.route('/scan' , methods=['POST'])
 def scan():
     global last_scanned_ip
-
     #Get IP from website's search bar
-
     target = request.form.get('target_ip').strip()
     #choice from dropdown
     scan_type = request.form.get('scan_type')
-
     results = []
 
     #Determine range based choice
     if scan_type == "common":
         ports_to_scan = [21,22,23,80, 443, 445, 3306, 3389]
-
     elif scan_type == "well-known":
         ports_to_scan = range(1, 1025)
-
     elif scan_type == "custom":
         try:
             # We use 'if start_str else 1' so the site doesn't crash if they leave it blank
-            start_str = request.form.get('start_port')
-            end_str = request.form.get('end_port')
-            
-            start = int(start_str) if start_str else 1
-            end = int(end_str) if end_str else 1024
+            start = int(request.form.get('start_port') or 1)
+            end = int(request.form.get('end_port') or 1024)
             ports_to_scan = range(start, end + 1)
         except ValueError:
             ports_to_scan = [80] # Safe fallback if they type letters instead of numbers
-
-    else: #Default/Test
+    else: 
         ports_to_scan = [80, 8000, 8080]
 
     try:
@@ -88,70 +90,58 @@ def scan():
         last_scanned_ip = ip # Save this globally for the download route
 
         #Speed
-        #1. Small helper funtion for threads to use
+        #1. NEW DYNAMIC DATABASE SCAN LOGIC (Fixing the Database Lookup)
         def thread_scan(port):
-            if scan_port(ip,port):
-                return generate_analysis(port)
+            with app.app_context():
+                if scan_port(ip, port):
+                # Search our new 'Vulnerability' intelligence table in SQL
+                    kb_match = Vulnerability.query.filter_by(port=port).first()
+
+                    from main import generate_analysis
+                    return generate_analysis(port, db_match=kb_match)
             return None
         
         #2. ThreadPoolExecutor, run scan in parallel
-        # max_workers = 20, ports are scanned at once.
         with ThreadPoolExecutor(max_workers=20) as executor:
-            #map helper function to every port
-            thread_results = executor.map(thread_scan, ports_to_scan)
+            thread_results = list(executor.map(thread_scan, ports_to_scan))
 
         #3. Collect findings that aren't none
         results = [r for r in thread_results if r is not None]
 
+        #Save to Hard Drive, Creates the .txt file in the background
+    
+        
+        # 4. STARTUP PERSISTENCE HANDSHAKE (Save results to database history)
+        summary_text = f"Audit Success: Identified {len(results)} vulnerabilities." if results else "Hardened: No vulnerabilities detected."
+        new_audit = AuditRecord(
+            target_ip=target,
+            ports_found=str(len(results)),
+            threat_summary=summary_text
+        )
+        db.session.add(new_audit)
+        db.session.commit() # Writing the audit to secusys.db history
 
-         #Save to Hard Drive, Creates the .txt file in the background
         if results:
             save_report_to_file(ip, results)
-    except socket.gaierror:
-        return "<h3>Error: Invalid IP or Hostname. Click 'Back' to try again.</h3>"
-    
-    found_ports_string = ", ".join(map(str, [p for p in results if "SUCCESS" in p]))
-    #grab port numbers from the strings
-
-    #we calculate a basic risk score. 
-    total_open = len(results)
-    final_threat = f"Total Open Ports: {total_open}. Audit status complete."
-
-    #create the actual database record using Auditrecord model
-    new_audit = AuditRecord(
-        target_ip = target,
-        ports_found = str(results), #save analysis as a list text
-        threat_summary = final_threat
-    )
-
-    #Handshake: save it to file permanently
-    try:
-        db.session.add(new_audit) #stage data
-        db.session.commit() #writes the data to secusys.db
-        print(f"[DATABASE] Successfully saved scan for {target}")
 
     except Exception as e:
-        db.session.rollback() #cancels the save if there's an error
-        print (f"[DATABASE ERROR] Could not save audit: {e}")    
+        db.session.rollback()
+        print (f"[DATABASE ERROR] Handshake failed: {e}")
 
-    # NEW UPDATED LOGIC: Re-calculate counts and history so UI updates immediately after scan
+
+    # 5. RE-REFRESH Dashboard Logic: Re-fetch variables before the page reloads
     total_audits = AuditRecord.query.count()
     history_logs = AuditRecord.query.order_by(AuditRecord.scan_date.desc()).limit(5).all()
 
-    # ADDED 'audit_count' and 'history' to the template return
+    # Pass the fresh audit_count and history to ensure UI matches the DB
     return render_template('index.html', results=results, target=target, audit_count=total_audits, history=history_logs)
 
 #The Download Route
 @app.route('/download')
 def download():
     global last_scanned_ip
-    
-    # Calculate what the filename should be
     filename = f"scan_report_{last_scanned_ip.replace('.', '_')}.txt"
-    
-    # Check if the file actually exists before trying to send it
     if os.path.exists(filename):
-        # send_file triggers the browser to download the file to the user's PC
         return send_file(filename, as_attachment=True)
     else:
         return "<h3>No report found. Please run a scan first!</h3>"
