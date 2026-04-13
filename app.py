@@ -248,8 +248,8 @@ def scan():
 
 #The Download Route
 @app.route('/download')
+@login_required
 def download():
-    global last_scanned_ip
     filename = f"scan_report_{last_scanned_ip.replace('.', '_')}.txt"
     if os.path.exists(filename):
         return send_file(filename, as_attachment=True)
