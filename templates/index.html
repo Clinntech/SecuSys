@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SecuSys Dashboard</title>
     <style>
-        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; margin: 0; line-height: 1.6;}
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, sans-serif; padding: 40px; margin: 0; line-height: 1.6;}
         .container { max-width: 950px; margin: auto; }
         h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin: 0; }
         
@@ -72,7 +72,12 @@
             <div style="border: 1px solid #30363d; border-radius: 8px; overflow: hidden;">
                 <table>
                     <thead>
-                        <tr><th>DATE / TIME (UTC)</th><th>INFRASTRUCTURE</th><th>SECURITY STATUS</th></tr>
+                        <tr>
+                            <th>DATE / TIME (UTC)</th>
+                            <th>INFRASTRUCTURE</th>
+                            <th>SECURITY STATUS</th>
+                            <th>ACTION</th> <!-- NEW ACTION COLUMN -->
+                        </tr>
                     </thead>
                     <tbody>
                         {% for audit in history %}
@@ -80,6 +85,21 @@
                             <td style="color: #8b949e; font-size: 0.85em;">{{ audit.scan_date.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td style="color: #58a6ff; font-family: monospace; font-weight: bold;">{{ audit.target_ip }}</td>
                             <td><span style="border: 1px solid #238636; background: rgba(35, 134, 54, 0.1); color: #2ea043; padding: 2px 8px; border-radius: 4px; font-size: 0.85em;">{{ audit.threat_summary }}</span></td>
+                            
+                            <!-- NEW TRIGGER HANDLER -->
+                            <td style="text-align: left;">
+                                {% if audit.remediation_status == 1 %}
+                                    <span style="background: rgba(88, 166, 255, 0.1); border: 1px solid #58a6ff; color: #58a6ff; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
+                                        SECURED
+                                    </span>
+                                {% else %}
+                                    <form action="{{ url_for('remediate', record_id=audit.id) }}" method="POST" style="display:inline;">
+                                        <button type="submit" style="padding: 4px 10px; font-size: 0.8em;">
+                                            DEPLOY FIX
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>

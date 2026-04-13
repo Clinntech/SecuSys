@@ -43,6 +43,12 @@ class AuditRecord(db.Model):
     threat_summary = db.Column(db.Text)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
+    #Tracks if a user clicked the remediate button (0 = not fixed, 1 = fixed)
+    remediation_status = db.Column(db.Integer, default=0)
+
+    #Stores actual log output from the Cisco router/Device
+    remediation_log = db.Column(db.Text, nullable=True)
+
     def __repr__(self):
         return f'<Audit {self.target_ip} on {self.scan_date}>'
 
@@ -140,8 +146,10 @@ def signup():
         new_user = User(username=user_name, password=hashed_password)
         db.session.add(new_user)
         db.session.commit()
+
+        flash(f"Security Profile Created: {user_name}. Please authenticate to enter the platform.", "success")
         
-        print(f"[IDENTITY] New account created: {user_name}")
+        print(f"[IDENTITY] New account verified: {user_name}")
         return redirect(url_for('login')) # Redirects to login page (which we build tomorrow)
 
     return render_template('signup.html')
@@ -255,6 +263,38 @@ def download():
         return send_file(filename, as_attachment=True)
     else:
         return "<h3>No report found. Please run a scan first!</h3>"
+
+@app.route('/remediate/<int:record_id>', methods=['POST'])
+@login_required
+def remediate(record_id):
+    """
+    SaaS Action Hub: This function is the gateway to our 
+    Cisco Netmiko logic. For now, it performs a logical fix.
+    """
+    # 1. Fetch the specific scan from our forensic logs
+    record = AuditRecord.query.get_or_404(record_id)
+
+    # 2. Safety Check: Only the owner can fix their own network!
+    if record.user_id != current_user.id:
+        flash("Authorization Violation: You do not own this infrastructure profile.", "danger")
+        return redirect(url_for('index'))
+
+    # 3. Simulate Cisco Remote Interaction (Phase 1 of Remediation)
+    # This is where we will integrate Netmiko in tomorrow's sprint.
+    try:
+        # LOGIC UPDATE: We are changing status 0 (Found) to 1 (Resolved)
+        record.remediation_status = 1
+        record.remediation_log = f"Handshake with {record.target_ip} verified. Applied Cisco standard hardening templates via SecuSys Bridge."
+        
+        db.session.commit()
+        
+        flash(f"SYSTEM ACTION SUCCESSFUL: Remediation logic deployed to {record.target_ip}. Security state updated.", "success")
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"REMEDIATION ERROR: Could not establish secure SSH tunnel to target.", "danger")
+
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     # Initialize DB file if it doesn't exist

@@ -13,10 +13,35 @@
         button:hover { background: #2ea043; }
         .nav-links { margin-top: 20px; font-size: 0.85em; color: #8b949e; }
         a { color: #58a6ff; text-decoration: none; }
+
+        /* RECOMMENDED: Styles for Flash Messages */
+        .alert { 
+            padding: 12px; 
+            border-radius: 6px; 
+            margin-bottom: 20px; 
+            font-size: 0.85em; 
+            font-weight: 500; 
+            border-left: 4px solid;
+        }
+        .alert-success { background: rgba(35, 134, 54, 0.2); color: #2ea043; border-color: #238636; }
+        .alert-danger { background: rgba(255, 123, 114, 0.15); color: #ff7b72; border-color: #f85149; }
     </style>
 </head>
 <body>
     <div class="login-card">
+
+        <!-- START: NEW SYSTEM NOTIFICATION UPDATE -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }}">
+                  📡 [SYSTEM]: {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        <!-- END: NEW SYSTEM NOTIFICATION UPDATE -->
+
         <h1>Dashboard Login</h1>
         
         <!-- This form talks to your @app.route('/login') -->
