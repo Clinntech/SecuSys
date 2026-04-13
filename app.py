@@ -1,6 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor #multithreading
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin, LoginManager, login_user, login_required, logout_user, current_user
+from flask_bcrypt import Bcrypt
 from datetime import datetime
 import socket
 import os
@@ -14,8 +16,22 @@ app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'secusys.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = 'dev-startup-key-123' # Necessary for Flask sessions
 
 db = SQLAlchemy(app)
+bcrypt = Bcrypt(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login' #Tells flask where the login page is. 
+
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(150), unique=True, nullable=False)
+    # Important: We never store real passwords, only the 'Hash'
+    password = db.Column(db.String(150), nullable=False) 
+    
+    # Relationship: A user can own many scans
+    scans = db.relationship('AuditRecord', backref='user_profile', lazy=True)
 
 # --- NEW: SCAN HISTORY MODEL ---
 # This is a 'Table' that will store every audit SecuSys ever does
@@ -23,12 +39,9 @@ class AuditRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     target_ip = db.Column(db.String(50), nullable=False)
     scan_date = db.Column(db.DateTime, default=datetime.utcnow)
-
-    #store ports found as strings, "80,22,443"
     ports_found = db.Column(db.String(500))
-
-    #Store risk level value
     threat_summary = db.Column(db.Text)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     def __repr__(self):
         return f'<Audit {self.target_ip} on {self.scan_date}>'
@@ -49,18 +62,112 @@ class Vulnerability(db.Model):
 #remember last scanned IP for download button
 last_scanned_ip = ""
 
+import socket # Ensure this is in your imports at the top
+
+def seed_intelligence():
+    """
+    Automatic SaaS Seeding: Populates 1,024 ports if the DB is empty.
+    No terminal commands required.
+    """
+    with app.app_context():
+        # Check if we already have intelligence in the database
+        if Vulnerability.query.count() < 1000:
+            print("[SYSTEM] Intelligence table empty. Initiating 1,024-port brain upload...")
+            
+            for p in range(1, 1025):
+                # Only add if the specific port doesn't exist
+                if not Vulnerability.query.filter_by(port=p).first():
+                    # 1. Fetch official name via networking library
+                    try:
+                        name = socket.getservbyport(p).upper()
+                    except:
+                        name = "INTERNAL-SERVICE"
+
+                    # 2. Assign Intelligence based on All-Rounder knowledge
+                    if p in [21, 23, 25, 110]:
+                        risk, dsc, fix = "HIGH", f"Unencrypted {name} protocol. Risk of sniffed credentials.", "Upgrade to Secure versions."
+                        acl = f"access-list 101 deny tcp any any eq {p}"
+                    elif p in [22, 443, 993, 995]:
+                        risk, dsc, fix = "SAFE", f"Securely encrypted {name} service verified.", "Maintain certificate security."
+                        acl = f"access-list 101 permit tcp any any eq {p}"
+                    elif p == 80:
+                        risk, dsc, fix = "MEDIUM", "Cleartext HTTP web service. MITM potential.", "Enforce HSTS and move to Port 443."
+                        acl = f"access-list 101 permit tcp [TRUSTED_IP] any any eq 80"
+                    elif p == 445:
+                        risk, dsc, fix = "CRITICAL", "SMB / Microsoft DS detected. WannaCry ransomware vector.", "Disable Port 445 on external interface immediately."
+                        acl = f"access-list 101 deny tcp any any eq 445"
+                    else:
+                        risk, dsc, fix = "LOW", f"Standard port for {name}. Baseline audit required.", "Follow Least Privilege policy."
+                        acl = f"access-list 101 deny tcp any any eq {p}"
+
+                    # 3. Create the Database Record
+                    db.session.add(Vulnerability(
+                        port=p, service=name, risk=risk, 
+                        description=dsc, fix=fix, cisco_acl=acl
+                    ))
+
+            db.session.commit()
+            print("[SYSTEM] Intelligence Handshake Complete. 1,024 Ports catalogued.")
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# --- ROUTES ---
 
 @app.route('/')
+@login_required
 def index():
     #Shows starting page
     #Fetch the total number of audits from the database
     total_audits = AuditRecord.query.count()
-    # NEW UPDATED LOGIC: Pull recent history from the database to fill the UI table
-    history_logs = AuditRecord.query.order_by(AuditRecord.scan_date.desc()).limit(5).all()
+    # NEW MILESTONE: Logic restricted to current_user.id for Forensic Data Isolation
+    history_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(5).all()
     
     return render_template('index.html', audit_count = total_audits, history = history_logs)
 
-@app.route('/scan' , methods=['POST'])
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        user_name = request.form.get('username')
+        pass_word = request.form.get('password')
+
+        # SECURITY: Generate a professional Hash
+        # This converts "mypassword123" into "$2b$12$K12u8e888..."
+        hashed_password = bcrypt.generate_password_hash(pass_word).decode('utf-8')
+
+        # Add to Database
+        new_user = User(username=user_name, password=hashed_password)
+        db.session.add(new_user)
+        db.session.commit()
+        
+        print(f"[IDENTITY] New account created: {user_name}")
+        return redirect(url_for('login')) # Redirects to login page (which we build tomorrow)
+
+    return render_template('signup.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user_name = request.form.get('username')
+        pass_word = request.form.get('password')
+        user = User.query.filter_by(username=user_name).first()
+        
+        # Checking the hash against the submitted password
+        if user and bcrypt.check_password_hash(user.password, pass_word):
+            login_user(user)
+            return redirect(url_for('index'))
+        else:
+            flash('Login Unsuccessful. Please check username and password', 'danger')
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/scan', methods=['POST'])
+@login_required #Prevents unauthorized API/Form submissions
 def scan():
     global last_scanned_ip
     #Get IP from website's search bar
@@ -116,7 +223,9 @@ def scan():
         new_audit = AuditRecord(
             target_ip=target,
             ports_found=str(len(results)),
-            threat_summary=summary_text
+            threat_summary=summary_text,
+            # MILESTONE FIX: Permanently bind this scan to the specific current_user.id
+            user_id=current_user.id 
         )
         db.session.add(new_audit)
         db.session.commit() # Writing the audit to secusys.db history
@@ -129,11 +238,12 @@ def scan():
         print (f"[DATABASE ERROR] Handshake failed: {e}")
 
 
-    # 5. RE-REFRESH Dashboard Logic: Re-fetch variables before the page reloads
+    # 5. RE-REFRESH Dashboard Logic: Re-fetch variables specifically for the CURRENT USER before the page reloads
     total_audits = AuditRecord.query.count()
-    history_logs = AuditRecord.query.order_by(AuditRecord.scan_date.desc()).limit(5).all()
+    # MILESTONE FIX: Refresh history ONLY for current user so the isolation stays true
+    history_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(5).all()
 
-    # Pass the fresh audit_count and history to ensure UI matches the DB
+    # Pass the fresh audit_count and isolated history to ensure UI matches the DB
     return render_template('index.html', results=results, target=target, audit_count=total_audits, history=history_logs)
 
 #The Download Route
@@ -147,4 +257,12 @@ def download():
         return "<h3>No report found. Please run a scan first!</h3>"
 
 if __name__ == '__main__':
+    # Initialize DB file if it doesn't exist
+    with app.app_context():
+        db.create_all()
+    
+    # NEW: Automatically fill the intelligence tables
+    seed_intelligence()
+    
+    # Start the SaaS Web Platform
     app.run(debug=True, port=8080)

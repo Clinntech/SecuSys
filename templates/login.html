@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SecuSys | Portal Login</title>
+    <style>
+        /* CSS stays the same as signup to keep your brand consistency */
+        body { background: #0d1117; color: #c9d1d9; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: #161b22; border: 1px solid #30363d; padding: 40px; border-radius: 12px; width: 320px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);}
+        h1 { color: #58a6ff; font-size: 1.6rem; margin-bottom: 25px; }
+        input { width: 90%; padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; }
+        button { width: 100%; padding: 12px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #2ea043; }
+        .nav-links { margin-top: 20px; font-size: 0.85em; color: #8b949e; }
+        a { color: #58a6ff; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>Dashboard Login</h1>
+        
+        <!-- This form talks to your @app.route('/login') -->
+        <form method="POST">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Unlock System</button>
+        </form>
+
+        <div class="nav-links">
+            Authorized personnel only. <br>
+            Don't have access? <a href="/signup">Apply for Sign-up here</a>
+        </div>
+    </div>
+</body>
+</html>
