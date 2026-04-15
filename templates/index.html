@@ -19,50 +19,29 @@
         .result-box { background: #010409; border: 1px solid #30363d; padding: 20px; border-radius: 6px; margin-top: 15px; white-space: pre-wrap; font-family: 'Courier New', Courier, monospace; font-size: 13px; color: #d1d5da; }
         #custom-fields { display: none; }
         
-        /* Forensic Logs Table Styles */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #161b22; }
         th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid #30363d; }
         th { background: #21262d; color: #8b949e; font-size: 0.8em; text-transform: uppercase; letter-spacing: 1px;}
         
-        /* Identity bar formatting */
         .identity-bar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; }
         .logout-link { color: #ff7b72; text-decoration: none; font-size: 0.85em; border: 1px solid transparent; padding: 2px 8px; border-radius: 4px; }
         .logout-link:hover { border: 1px solid #ff7b72; }
 
-        /* FLOATING NOTIFICATION SYSTEM (TOASTS) */
-        #notification-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            width: 350px;
-            z-index: 10000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .alert { 
-            padding: 15px; 
-            border-radius: 8px; 
-            border-left: 5px solid; 
-            font-size: 0.85em; 
-            font-weight: 500; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            animation: slideIn 0.3s ease-out;
-        }
-        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        /* Notification Styles */
+        #notification-container { position: fixed; top: 20px; right: 20px; width: 350px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
+        .alert { padding: 15px; border-radius: 8px; border-left: 5px solid; font-size: 0.85em; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
         .alert-success { background: #1a3321; border-color: #238636; color: #4fb35e; }
         .alert-danger { background: #3d1616; border-color: #ff7b72; color: #ff7b72; }
     </style>
 </head>
 <body>
 
-    <!-- NOTIFICATION HUB (Now Floating to avoid messing with UI) -->
     <div id="notification-container">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
               <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} flask-msg">
-                {{ message }}
+                SECUSYS: {{ message }}
               </div>
             {% endfor %}
           {% endif %}
@@ -70,31 +49,31 @@
     </div>
 
     <div class="container">
-        <!-- Platform Header with User Context -->
         <div class="identity-bar">
             <h1>SecuSys Dashboard <span style="font-size: 0.4em; color: #8b949e;">FOUNDER v3.2</span></h1>
             <div style="font-size: 0.9em; color: #8b949e;">
+                <!-- Updated Settings Link (No Icon) -->
+                <a href="/settings" style="color: #58a6ff; text-decoration: none; margin-right: 15px;">Network Settings</a> | 
                 Logged in as: <strong style="color: #58a6ff;">{{ current_user.username }}</strong> | 
                 <a href="/logout" class="logout-link">Terminate Session</a>
             </div>
         </div>
         
-        <!-- Proof Metrics -->
         <div class="status-feed">
-            {{ audit_count }} total forensic network audits have been executed on the platform globally.
+            SECUSYS INSIGHTS: {{ audit_count }} total forensic network audits have been executed on the platform.
         </div>
 
         <div class="control-panel">
             <form action="/scan" method="post">
                 <div class="input-group">
-                    <input type="text" name="target_ip" placeholder="Audit Target (e.g. 127.0.0.1)" required>
+                    <input type="text" name="target_ip" placeholder="Network Target (e.g. 127.0.0.1)" required>
                     <select name="scan_type" id="scan_mode" onchange="togglePorts()">
                         <option value="test">Quick Scan</option>
                         <option value="common">Common Service Audit</option>
                         <option value="well-known">Well-Known Range (1-1024)</option>
                         <option value="custom">Advanced Custom Range</option>
                     </select>
-                    <button type="submit">Execute Audit</button>
+                    <button type="submit">Begin Security Audit</button>
                 </div>
                 <div id="custom-fields" class="input-group">
                     <input type="number" name="start_port" placeholder="Start Port">
@@ -131,16 +110,24 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                {% if not history %}
+                <p style="text-align: center; padding: 25px; color: #8b949e;"><em>Awaiting initial audit for this account profile.</em></p>
+                {% endif %}
             </div>
         </div>
 
         {% if target %}
-            <div style="margin-top: 40px;">
+            <div style="margin-top: 40px; border-top: 1px dotted #30363d; padding-top: 30px;">
                 <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <h2>Results for {{ target }}</h2>
-                    {% if results %} <a href="/download" style="font-size: 0.9em; color: #58a6ff; text-decoration: none;">Download Audit Report</a> {% endif %}
+                    <h2 style="margin: 0;">Live Results: {{ target }}</h2>
+                    {% if results %}
+                        <a href="/download" style="color: #58a6ff; text-decoration: none; font-size: 0.9em;">Download Audit Report (.TXT)</a>
+                    {% endif %}
                 </div>
-                {% for report in results %} <div class="result-box">{{ report }}</div> {% endfor %}
+                
+                {% for report in results %}
+                    <div class="result-box">{{ report }}</div>
+                {% endfor %}
             </div>
         {% endif %}
     </div>
@@ -151,7 +138,6 @@
             document.getElementById("custom-fields").style.display = mode === "custom" ? "flex" : "none";
         }
 
-        // AUTO-DISMISS SCRIPTS FOR NOTIFICATIONS
         setTimeout(function() {
             const alerts = document.querySelectorAll('.flask-msg');
             alerts.forEach(alert => {
@@ -159,7 +145,7 @@
                 alert.style.opacity = "0";
                 setTimeout(() => alert.remove(), 600);
             });
-        }, 7000); // 7 seconds
+        }, 7000); 
     </script>
 </body>
 </html>

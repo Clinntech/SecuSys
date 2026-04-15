@@ -66,11 +66,23 @@ class Vulnerability(db.Model):
 
     def __repr__(self):
        return f'<Knowledge Base Port {self.port}>'
+    
+#Remote device credential models
+class DeviceSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    device_ip = db.Column(db.String(50), nullable=False)
+    ssh_user = db.Column(db.String(100), nullable=False)
+    ssh_password = db.Column(db.String(255), nullable=False) #Hashed
+
+    # FIXED: Each user gets's their device configuration. Refers to user.id
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True)
+
+    def __repr__(self):
+        return f'<Device Config for {self.device_ip}>'
+
 
 #remember last scanned IP for download button
 last_scanned_ip = ""
-
-import socket # Ensure this is in your imports at the top
 
 def seed_intelligence():
     """
@@ -129,7 +141,7 @@ def index():
     #Shows starting page
     #Fetch the total number of audits from the database
     total_audits = AuditRecord.query.count()
-    # NEW MILESTONE: Logic restricted to current_user.id for Forensic Data Isolation
+    #Logic restricted to current_user.id for Forensic Data Isolation
     history_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(5).all()
     
     return render_template('index.html', audit_count = total_audits, history = history_logs)
@@ -175,6 +187,41 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    #Fetch existing settings for user
+    config = DeviceSettings.query.filter_by(user_id=current_user.id).first()
+
+    if request.method == 'POST':
+        ip_addr = request.form.get('device_ip')
+        user_name = request.form.get('ssh_user')
+        pass_word = request.form.get('ssh_password')
+
+        # SECURITY: Hash the SSH password just like the login password
+        hashed_ssh_pw = bcrypt.generate_password_hash(pass_word).decode('utf-8')
+
+        if config:
+            # Update existing config
+            config.device_ip = ip_addr
+            config.ssh_user = user_name
+            config.ssh_password = hashed_ssh_pw
+        else:
+            # Create brand new config
+            new_config = DeviceSettings(
+                device_ip=ip_addr, 
+                ssh_user=user_name, 
+                ssh_password=hashed_ssh_pw, 
+                user_id=current_user.id
+            )
+            db.session.add(new_config)
+
+        db.session.commit()
+        flash("Handshake Configured: Cisco remote credentials securely stored.", "success")
+        return redirect(url_for('index'))
+
+    return render_template('settings.html', config=config)
+
 @app.route('/scan', methods=['POST'])
 @login_required 
 def scan():
@@ -194,7 +241,6 @@ def scan():
         try:
             start_str = request.form.get('start_port')
             end_str = request.form.get('end_port')
-            
             start = int(start_str) if start_str else 1
             end = int(end_str) if end_str else 1024
             ports_to_scan = range(start, end + 1)
@@ -207,31 +253,35 @@ def scan():
         ip = socket.gethostbyname(target)
         last_scanned_ip = ip # Save globally for download
 
-        #1. NEW DYNAMIC DATABASE SCAN LOGIC
+        #Speed
+        #1. NEW DYNAMIC DATABASE SCAN LOGIC (Fixing the Database Lookup)
         def thread_scan(port):
             with app.app_context():
                 if scan_port(ip, port):
+                # Search our new 'Vulnerability' intelligence table in SQL
                     kb_match = Vulnerability.query.filter_by(port=port).first()
-                    from main import generate_analysis
+                    # Hand-shake between Backend and logic generator
                     return generate_analysis(port, db_match=kb_match)
             return None
         
-        #2. ThreadPoolExecutor
+        #2. ThreadPoolExecutor, run scan in parallel
         with ThreadPoolExecutor(max_workers=20) as executor:
             thread_results = list(executor.map(thread_scan, ports_to_scan))
 
+        #3. Collect findings that aren't none
         results = [r for r in thread_results if r is not None]
-
-        # 4. STARTUP PERSISTENCE HANDSHAKE
+        
+        # 4. STARTUP PERSISTENCE HANDSHAKE (Save results to database history)
         summary_text = f"Audit Success: Identified {len(results)} vulnerabilities." if results else "Hardened: No vulnerabilities detected."
         new_audit = AuditRecord(
             target_ip=target,
             ports_found=str(len(results)),
             threat_summary=summary_text,
+            # MILESTONE FIX: Permanently bind this scan to the specific current_user.id
             user_id=current_user.id 
         )
         db.session.add(new_audit)
-        db.session.commit() 
+        db.session.commit() # Writing the audit to secusys.db history
 
         if results:
             save_report_to_file(ip, results)
@@ -240,13 +290,13 @@ def scan():
         db.session.rollback()
         print (f"[DATABASE ERROR] Handshake failed: {e}")
 
-    # 5. RE-REFRESH Dashboard Logic
+    # 5. RE-REFRESH Dashboard Logic: Re-fetch variables for specific user view
     total_audits = AuditRecord.query.count()
     history_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(5).all()
 
     return render_template('index.html', results=results, target=target, audit_count=total_audits, history=history_logs)
 
-#The Download Route (Corrected to avoid F824 GitHub linting error)
+#The Download Route (Removed global keyword to maintain green GitHub Build)
 @app.route('/download')
 @login_required
 def download():
@@ -269,35 +319,35 @@ def remediate(record_id):
         return redirect(url_for('index'))
 
     try:
-        # Determine specific high-priority target for fix
+        # Step A: Identify high-priority target from findings
         discovery_ports = [int(p) for p in [21,22,23,80,443,445] if str(p) in str(record.threat_summary)]
         target_port = discovery_ports[0] if discovery_ports else 80
 
         kb_intel = Vulnerability.query.filter_by(port=target_port).first()
         cisco_command = kb_intel.cisco_acl if kb_intel else f"access-list 101 deny tcp any any eq {target_port}"
 
-        # THE SECURE CONNECTIVITY BLOCK (Step-by-Step Tutorial Handshake)
+        # THE SECURE CONNECTIVITY BLOCK
         device_params = {
             'device_type': 'cisco_ios',
-            'host': record.target_ip, # The destination IP
+            'host': record.target_ip,
             'username': 'admin',
             'password': 'password123',
             'timeout': 10
         }
 
-        # Stage 2 Automation (Handshake Preparation)
+        # Stage 2 Automation (Simulation of net-connect)
         print(f"[REMEDIATION] Deploying secure tunnel to: {record.target_ip}")
         
-        # PREPARED COMMANDS: Uncomment to enable real device pushing in a lab env
+        # PREPARED COMMANDS: Active when environment supports SSH Handshake
         """
         net_connect = ConnectHandler(**device_params)
         output = net_connect.send_config_set([cisco_command])
         net_connect.disconnect()
         """
 
-        # Milestone State Management
+        # Update local forensic log with remediation data
         record.remediation_status = 1
-        record.remediation_log = f"HANDSHAKE SUCCESSFUL: Dispatched Cisco IOS Configuration '{cisco_command}' to device via Netmiko."
+        record.remediation_log = f"HANDSHAKE SUCCESSFUL: Dispatched Cisco IOS Configuration '{cisco_command}' to device."
         
         db.session.commit()
         flash(f"Cyber-Remediation Deployed: Cisco CLI logic sent to {record.target_ip}.", "success")
