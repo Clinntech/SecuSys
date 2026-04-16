@@ -32,6 +32,11 @@
         .alert { padding: 15px; border-radius: 8px; border-left: 5px solid; font-size: 0.85em; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
         .alert-success { background: #1a3321; border-color: #238636; color: #4fb35e; }
         .alert-danger { background: #3d1616; border-color: #ff7b72; color: #ff7b72; }
+        
+        /* Dashboard Enhancements */
+        .pdf-link { color: #8b949e; text-decoration: none; font-size: 0.75em; border: 1px solid #30363d; padding: 3px 8px; border-radius: 4px; margin-left: 10px; transition: 0.2s; }
+        .pdf-link:hover { color: #58a6ff; border-color: #58a6ff; }
+        .score-badge { padding: 4px 12px; border-radius: 20px; background: #010409; border: 1px solid #58a6ff; color: #58a6ff; font-weight: bold; font-family: monospace; font-size: 1.1em;}
     </style>
 </head>
 <body>
@@ -50,9 +55,8 @@
 
     <div class="container">
         <div class="identity-bar">
-            <h1>SecuSys Dashboard <span style="font-size: 0.4em; color: #8b949e;">v1.2</span></h1>
+            <h1>SecuSys Dashboard <span style="font-size: 0.4em; color: #8b949e;">FOUNDER v3.2</span></h1>
             <div style="font-size: 0.9em; color: #8b949e;">
-                <!-- Updated Settings Link (No Icon) -->
                 <a href="/settings" style="color: #58a6ff; text-decoration: none; margin-right: 15px;">Network Settings</a> | 
                 Logged in as: <strong style="color: #58a6ff;">{{ current_user.username }}</strong> | 
                 <a href="/logout" class="logout-link">Terminate Session</a>
@@ -60,7 +64,7 @@
         </div>
         
         <div class="status-feed">
-            SECUSYS INSIGHTS: {{ audit_count }} total forensic network audits have been executed on the platform.
+            📡 SECUSYS INSIGHTS: {{ audit_count }} total forensic network audits have been executed on the platform.
         </div>
 
         <div class="control-panel">
@@ -93,7 +97,11 @@
                         {% for audit in history %}
                         <tr>
                             <td style="color: #8b949e; font-size: 0.85em;">{{ audit.scan_date.strftime('%Y-%m-%d %H:%M') }}</td>
-                            <td style="color: #58a6ff; font-family: monospace; font-weight: bold;">{{ audit.target_ip }}</td>
+                            <td style="color: #58a6ff; font-family: monospace; font-weight: bold;">
+                                {{ audit.target_ip }} 
+                                <!-- Correct PDF generation link for history -->
+                                <a href="{{ url_for('export_pdf', record_id=audit.id) }}" class="pdf-link">Export PDF</a>
+                            </td>
                             <td><span style="border: 1px solid #238636; background: rgba(35, 134, 54, 0.1); color: #2ea043; padding: 2px 8px; border-radius: 4px; font-size: 0.85em;">{{ audit.threat_summary }}</span></td>
                             <td style="text-align: left;">
                                 {% if audit.remediation_status == 1 %}
@@ -116,13 +124,24 @@
             </div>
         </div>
 
+        <!-- Current Live Result Display -->
         {% if target %}
             <div style="margin-top: 40px; border-top: 1px dotted #30363d; padding-top: 30px;">
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <h2 style="margin: 0;">Live Results: {{ target }}</h2>
-                    {% if results %}
-                        <a href="/download" style="color: #58a6ff; text-decoration: none; font-size: 0.9em;">Download Audit Report (.TXT)</a>
-                    {% endif %}
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px;">
+                    <h2 style="margin: 0;">Audit Findings: {{ target }} </h2>
+                    
+                    <div style="display: flex; gap: 20px; align-items: center;">
+                        <!-- Updated Logic for Security Score Visualization -->
+                        {% if history %}
+                        <div style="font-size: 0.9em; color: #8b949e;"> 
+                            SYSTEM HEALTH SCORE: <span class="score-badge">{{ history[0].security_score }} / 100</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if results %}
+                            <a href="/download" style="color: #58a6ff; text-decoration: none; font-size: 0.9em; border: 1px solid #58a6ff; padding: 5px 12px; border-radius: 6px;">Download Raw Data</a>
+                        {% endif %}
+                    </div>
                 </div>
                 
                 {% for report in results %}

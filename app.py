@@ -1,6 +1,6 @@
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
-from concurrent.futures import ThreadPoolExecutor #multithreading
+from concurrent.futures import ThreadPoolExecutor # multithreading
 from flask import Flask, render_template, request, send_file, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin, LoginManager, login_user, login_required, logout_user, current_user
@@ -8,6 +8,10 @@ from flask_bcrypt import Bcrypt
 from datetime import datetime
 import socket
 import os
+import io # Needed for PDF memory management
+from reportlab.lib.pagesizes import letter # Standard PDF size
+from reportlab.pdfgen import canvas # The drawing engine for PDFs
+
 # This line borrows the function 
 from main import scan_port, generate_analysis, save_report_to_file
 
@@ -25,6 +29,24 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login' #Tells flask where the login page is. 
+
+# --- STARTUP ANALYTICS HELPER ---
+def calculate_security_score(results_list):
+    """
+    SaaS Proprietary Logic: Calculates a 0-100 hardening score.
+    Higher finding count and severity reduces the overall score.
+    """
+    score = 100
+    for report in results_list:
+        if "CRITICAL" in report:
+            score -= 20
+        elif "HIGH" in report:
+            score -= 10
+        elif "MEDIUM" in report:
+            score -= 5
+        elif "SUSPICIOUS" in report:
+            score -= 5
+    return max(0, score)
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -50,6 +72,9 @@ class AuditRecord(db.Model):
 
     #Stores actual log output from the Cisco router/Device
     remediation_log = db.Column(db.Text, nullable=True)
+    
+    # UPDATED THURSDAY: Track the historical score for executive reporting
+    security_score = db.Column(db.Integer, default=100)
 
     def __repr__(self):
         return f'<Audit {self.target_ip} on {self.scan_date}>'
@@ -83,6 +108,8 @@ class DeviceSettings(db.Model):
 
 #remember last scanned IP for download button
 last_scanned_ip = ""
+
+import socket # Ensure this is in your imports at the top
 
 def seed_intelligence():
     """
@@ -141,7 +168,7 @@ def index():
     #Shows starting page
     #Fetch the total number of audits from the database
     total_audits = AuditRecord.query.count()
-    #Logic restricted to current_user.id for Forensic Data Isolation
+    # NEW MILESTONE: Logic restricted to current_user.id for Forensic Data Isolation
     history_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(5).all()
     
     return render_template('index.html', audit_count = total_audits, history = history_logs)
@@ -241,6 +268,7 @@ def scan():
         try:
             start_str = request.form.get('start_port')
             end_str = request.form.get('end_port')
+            
             start = int(start_str) if start_str else 1
             end = int(end_str) if end_str else 1024
             ports_to_scan = range(start, end + 1)
@@ -270,6 +298,9 @@ def scan():
 
         #3. Collect findings that aren't none
         results = [r for r in thread_results if r is not None]
+
+        # THURSDAY UPDATE: Calculate executive security score
+        final_score = calculate_security_score(results)
         
         # 4. STARTUP PERSISTENCE HANDSHAKE (Save results to database history)
         summary_text = f"Audit Success: Identified {len(results)} vulnerabilities." if results else "Hardened: No vulnerabilities detected."
@@ -278,7 +309,8 @@ def scan():
             ports_found=str(len(results)),
             threat_summary=summary_text,
             # MILESTONE FIX: Permanently bind this scan to the specific current_user.id
-            user_id=current_user.id 
+            user_id=current_user.id,
+            security_score=final_score # Store the score in the DB
         )
         db.session.add(new_audit)
         db.session.commit() # Writing the audit to secusys.db history
@@ -306,6 +338,69 @@ def download():
     else:
         return "<h3>No report found. Please run a scan first!</h3>"
 
+# --- THURSDAY STARTUP UPGRADE: EXECUTIVE PDF ENGINE ---
+@app.route('/export_pdf/<int:record_id>')
+@login_required
+def export_pdf(record_id):
+    # 1. Fetch data from DB
+    record = AuditRecord.query.get_or_404(record_id)
+
+    # Authorization Guard
+    if record.user_id != current_user.id:
+        return "Unauthorized Access Blocked.", 403
+
+    # 2. Create a memory buffer for the PDF
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    
+    # 3. Render Executive Design
+    # Logo Placeholder / Title
+    p.setFont("Helvetica-Bold", 24)
+    p.drawString(100, 750, "SECUSYS ENTERPRISE AUDIT")
+    p.setFont("Helvetica", 10)
+    p.drawString(100, 735, "Founders Series Professional v3.2 - Proprietary Forensic Artifact")
+    p.line(100, 725, 500, 725)
+
+    # Target Intel
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(100, 700, f"INFRASTRUCTURE TARGET: {record.target_ip}")
+    p.setFont("Helvetica", 12)
+    p.drawString(100, 680, f"Client Authentication ID: {current_user.username}")
+    p.drawString(100, 665, f"Execution Timestamp: {record.scan_date}")
+
+    # Risk Metrics
+    p.setFont("Helvetica-Bold", 12)
+    p.setFillColorRGB(0.8, 0, 0) # Executive Alert Color (Red-ish)
+    p.drawString(100, 630, f"OVERALL SECURITY HARDENING SCORE: {record.security_score}/100")
+    
+    p.setFillColorRGB(0, 0, 0) # Back to Black
+    p.setFont("Helvetica-Oblique", 11)
+    p.drawString(100, 610, f"System Executive Summary: {record.threat_summary}")
+
+    # Page Body / Detailed Insights (Note: Simplified for PDF v1)
+    p.setFont("Helvetica", 10)
+    p.drawString(100, 580, "Individual findings and Cisco remediation strategies are catalogued below:")
+    p.rect(100, 400, 400, 160) # Visual Detail Box
+    p.drawString(110, 540, "Scan Detail Map:")
+    p.drawString(110, 525, f"- Ports Detected: {record.ports_found}")
+    
+    if record.remediation_status == 1:
+        p.drawString(110, 480, "OPERATIONAL STATUS: [X] RESOLVED - Cisco Mitigation Successfully Deployed")
+    else:
+        p.drawString(110, 480, "OPERATIONAL STATUS: [!] UNRESOLVED - Infrastructure Action Required")
+
+    # Final Footer
+    p.setFont("Helvetica-Oblique", 8)
+    p.drawString(100, 100, "CONFIDENTIAL DOCUMENT - Generated via SecuSys Forensic SaaS Engine")
+
+    # 4. Finalize
+    p.showPage()
+    p.save()
+    
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name=f"SecuSys_Report_{record.target_ip}.pdf", mimetype='application/pdf')
+
+
 @app.route('/remediate/<int:record_id>', methods=['POST'])
 @login_required
 def remediate(record_id):
@@ -329,7 +424,7 @@ def remediate(record_id):
         # THE SECURE CONNECTIVITY BLOCK
         device_params = {
             'device_type': 'cisco_ios',
-            'host': record.target_ip,
+            'host': record.target_ip, # The destination IP
             'username': 'admin',
             'password': 'password123',
             'timeout': 10
