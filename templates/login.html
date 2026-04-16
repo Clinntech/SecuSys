@@ -35,14 +35,14 @@
           {% if messages %}
             {% for category, message in messages %}
               <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }}">
-                  📡 [SYSTEM]: {{ message }}
+                  {{ message }}
               </div>
             {% endfor %}
           {% endif %}
         {% endwith %}
         <!-- END: NEW SYSTEM NOTIFICATION UPDATE -->
 
-        <h1>Dashboard Login</h1>
+        <h1>Login</h1>
         
         <!-- This form talks to your @app.route('/login') -->
         <form method="POST">
@@ -53,7 +53,8 @@
 
         <div class="nav-links">
             Authorized personnel only. <br>
-            Don't have access? <a href="/signup">Apply for Sign-up here</a>
+            Don't have access? 
+            <a href="/signup">Apply for Sign-up here</a>
         </div>
     </div>
 </body>

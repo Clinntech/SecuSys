@@ -46,7 +46,7 @@
           {% if messages %}
             {% for category, message in messages %}
               <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} flask-msg">
-                SECUSYS: {{ message }}
+                {{ message }}
               </div>
             {% endfor %}
           {% endif %}
@@ -64,7 +64,7 @@
         </div>
         
         <div class="status-feed">
-            📡 SECUSYS INSIGHTS: {{ audit_count }} total forensic network audits have been executed on the platform.
+            {{ audit_count }} total forensic network audits have been executed on the platform.
         </div>
 
         <div class="control-panel">
@@ -73,7 +73,7 @@
                     <input type="text" name="target_ip" placeholder="Network Target (e.g. 127.0.0.1)" required>
                     <select name="scan_type" id="scan_mode" onchange="togglePorts()">
                         <option value="test">Quick Scan</option>
-                        <option value="common">Common Service Audit</option>
+                        <option value="common">Common Service Audit(21,22,23,80, 443, 445, 3306, 3389)</option>
                         <option value="well-known">Well-Known Range (1-1024)</option>
                         <option value="custom">Advanced Custom Range</option>
                     </select>
