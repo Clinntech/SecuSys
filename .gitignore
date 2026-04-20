@@ -13,3 +13,4 @@ scan_report_*.txt
 Thumbs.db
 .DS_Store
 secusys.db
+.env

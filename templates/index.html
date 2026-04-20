@@ -5,48 +5,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SecuSys Dashboard</title>
     <style>
+        /* Base SaaS Cyber Theme */
         body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; margin: 0; line-height: 1.6;}
-        .container { max-width: 950px; margin: auto; }
+        .container { max-width: 1050px; margin: auto; }
         h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin: 0; }
         
-        .status-feed { background: rgba(88, 166, 255, 0.1); border: 1px solid #58a6ff; padding: 15px; border-radius: 8px; margin-bottom: 30px; color: #58a6ff; font-weight: bold; }
+        /* Stats and Context Bar */
+        .status-feed { background: rgba(88, 166, 255, 0.1); border: 1px solid #58a6ff; padding: 15px; border-radius: 8px; margin-bottom: 30px; color: #58a6ff; font-weight: bold; font-size: 0.9em;}
+        .identity-bar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; }
+        .logout-link { color: #ff7b72; text-decoration: none; font-size: 0.85em; border: 1px solid transparent; padding: 2px 8px; border-radius: 4px; }
+        .logout-link:hover { border-color: #ff7b72; }
+
+        /* Scanning Control Deck */
         .control-panel { background: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 30px; }
         .input-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         input, select { padding: 12px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; flex: 1; min-width: 200px;}
-        button { padding: 12px 30px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button { padding: 12px 30px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         button:hover { background: #2ea043; }
-        
-        .result-box { background: #010409; border: 1px solid #30363d; padding: 20px; border-radius: 6px; margin-top: 15px; white-space: pre-wrap; font-family: 'Courier New', Courier, monospace; font-size: 13px; color: #d1d5da; }
-        #custom-fields { display: none; }
-        
+        #custom-fields { display: none; } /* Managed via JS */
+
+        /* Professional Audit Table */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #161b22; }
-        th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid #30363d; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #30363d; }
         th { background: #21262d; color: #8b949e; font-size: 0.8em; text-transform: uppercase; letter-spacing: 1px;}
         
-        .identity-bar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; }
-        .logout-link { color: #ff7b72; text-decoration: none; font-size: 0.85em; border: 1px solid transparent; padding: 2px 8px; border-radius: 4px; }
-        .logout-link:hover { border: 1px solid #ff7b72; }
+        /* Links and Badges */
+        .pdf-link { color: #8b949e; text-decoration: none; font-size: 0.75em; border: 1px solid #30363d; padding: 3px 8px; border-radius: 4px; margin-left: 10px; }
+        .pdf-link:hover { color: #58a6ff; border-color: #58a6ff; }
+        .remediation-badge { color: #58a6ff; font-weight: bold; font-size: 0.85em; cursor: help; border: 1px solid #58a6ff; padding: 2px 8px; border-radius: 4px; }
 
-        /* Notification Styles */
+        /* Forensic Results Boxes */
+        .result-box { background: #010409; border: 1px solid #30363d; padding: 20px; border-radius: 6px; margin-top: 15px; white-space: pre-wrap; font-family: 'Courier New', Courier, monospace; font-size: 13px; color: #d1d5da; }
+
+        /* Fixed Notification Hub */
         #notification-container { position: fixed; top: 20px; right: 20px; width: 350px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
-        .alert { padding: 15px; border-radius: 8px; border-left: 5px solid; font-size: 0.85em; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .alert { padding: 15px; border-radius: 8px; border-left: 5px solid; font-size: 0.85em; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .alert-success { background: #1a3321; border-color: #238636; color: #4fb35e; }
         .alert-danger { background: #3d1616; border-color: #ff7b72; color: #ff7b72; }
-        
-        /* Dashboard Enhancements */
-        .pdf-link { color: #8b949e; text-decoration: none; font-size: 0.75em; border: 1px solid #30363d; padding: 3px 8px; border-radius: 4px; margin-left: 10px; transition: 0.2s; }
-        .pdf-link:hover { color: #58a6ff; border-color: #58a6ff; }
-        .score-badge { padding: 4px 12px; border-radius: 20px; background: #010409; border: 1px solid #58a6ff; color: #58a6ff; font-weight: bold; font-family: monospace; font-size: 1.1em;}
     </style>
 </head>
 <body>
 
+    <!-- OVERLAY SYSTEM NOTIFICATIONS -->
     <div id="notification-container">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
               <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} flask-msg">
-                {{ message }}
+                <strong>ALERT:</strong> {{ message }}
               </div>
             {% endfor %}
           {% endif %}
@@ -54,6 +60,7 @@
     </div>
 
     <div class="container">
+        <!-- Dashboard Header Area -->
         <div class="identity-bar">
             <h1>SecuSys Dashboard <span style="font-size: 0.4em; color: #8b949e;">FOUNDER v3.2</span></h1>
             <div style="font-size: 0.9em; color: #8b949e;">
@@ -63,54 +70,63 @@
             </div>
         </div>
         
+        <!-- Social Proof Stats -->
         <div class="status-feed">
-            {{ audit_count }} total forensic network audits have been executed on the platform.
+            📡 ANALYTICS: {{ audit_count }} total forensic network audits have been executed on the platform.
         </div>
 
+        <!-- Scanning Command Center -->
         <div class="control-panel">
             <form action="/scan" method="post">
                 <div class="input-group">
                     <input type="text" name="target_ip" placeholder="Network Target (e.g. 127.0.0.1)" required>
                     <select name="scan_type" id="scan_mode" onchange="togglePorts()">
                         <option value="test">Quick Scan</option>
-                        <option value="common">Common Service Audit(21,22,23,80, 443, 445, 3306, 3389)</option>
-                        <option value="well-known">Well-Known Range (1-1024)</option>
-                        <option value="custom">Advanced Custom Range</option>
+                        <option value="common">Common Audit(21,22,23,80, 443, 445, 3306, 3389)</option>
+                        <option value="well-known">Well-known Audit (1-1024)</option>
+                        <option value="custom">Custom Range Audit</option>
                     </select>
-                    <button type="submit">Begin Security Audit</button>
+                    <button type="submit">EXECUTE SCAN</button>
                 </div>
                 <div id="custom-fields" class="input-group">
-                    <input type="number" name="start_port" placeholder="Start Port">
-                    <input type="number" name="end_port" placeholder="End Port">
+                    <input type="number" name="start_port" placeholder="Starting Port">
+                    <input type="number" name="end_port" placeholder="Ending Port">
                 </div>
             </form>
         </div>
 
+        <!-- Forensic Traceability Logs Table -->
         <div style="margin-top: 50px;">
-            <h3>Recent Forensic Activity</h3>
-            <div style="border: 1px solid #30363d; border-radius: 8px; overflow: hidden;">
+            <h3 style="text-transform: uppercase; letter-spacing: 2px; font-size: 0.85em; color: #8b949e;">Recent Forensic Audit History</h3>
+            <div style="border: 1px solid #30363d; border-radius: 8px; overflow: hidden; margin-top: 15px;">
                 <table>
                     <thead>
-                        <tr><th>DATE / TIME (UTC)</th><th>INFRASTRUCTURE</th><th>SECURITY STATUS</th><th>ACTION</th></tr>
+                        <tr>
+                            <th>DATE (UTC)</th>
+                            <th>TARGET INFRASTRUCTURE</th>
+                            <th>SUMMARY REPORT</th>
+                            <th>ENGINE ACTIONS</th>
+                        </tr>
                     </thead>
                     <tbody>
                         {% for audit in history %}
                         <tr>
-                            <td style="color: #8b949e; font-size: 0.85em;">{{ audit.scan_date.strftime('%Y-%m-%d %H:%M') }}</td>
-                            <td style="color: #58a6ff; font-family: monospace; font-weight: bold;">
-                                {{ audit.target_ip }} 
-                                <!-- Correct PDF generation link for history -->
-                                <a href="{{ url_for('export_pdf', record_id=audit.id) }}" class="pdf-link">Export PDF</a>
+                            <td style="color: #8b949e; font-size: 0.8em;">{{ audit.scan_date.strftime('%m-%d-%Y | %H:%M') }}</td>
+                            <td>
+                                <strong style="color: #c9d1d9; font-family: monospace;">{{ audit.target_ip }}</strong> 
+                                <a href="{{ url_for('export_pdf', record_id=audit.id) }}" class="pdf-link">Download PDF Audit</a>
                             </td>
-                            <td><span style="border: 1px solid #238636; background: rgba(35, 134, 54, 0.1); color: #2ea043; padding: 2px 8px; border-radius: 4px; font-size: 0.85em;">{{ audit.threat_summary }}</span></td>
+                            <td>
+                                <span style="font-size: 0.85em;">{{ audit.threat_summary }}</span>
+                            </td>
                             <td style="text-align: left;">
                                 {% if audit.remediation_status == 1 %}
-                                    <span style="background: rgba(88, 166, 255, 0.1); border: 1px solid #58a6ff; color: #58a6ff; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; cursor: help;" title="{{ audit.remediation_log }}">
+                                    <span class="remediation-badge" title="{{ audit.remediation_log }}">
                                         SECURED
                                     </span>
                                 {% else %}
-                                    <form action="{{ url_for('remediate', record_id=audit.id) }}" method="POST" style="display:inline;">
-                                        <button type="submit" style="padding: 4px 10px; font-size: 0.8em;">DEPLOY FIX</button>
+                                    <form action="{{ url_for('remediate', record_id=audit.id) }}" method="POST">
+                                        <button type="submit" style="padding: 5px 12px; font-size: 0.7em;">SECURE</button>
                                     </form>
                                 {% endif %}
                             </td>
@@ -119,52 +135,50 @@
                     </tbody>
                 </table>
                 {% if not history %}
-                <p style="text-align: center; padding: 25px; color: #8b949e;"><em>Awaiting initial audit for this account profile.</em></p>
+                <p style="text-align: center; padding: 30px; color: #8b949e;"><em>Awaiting telemetry data... no previous audits identified for this account.</em></p>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Current Live Result Display -->
+        <!-- Dynamic Results Console -->
         {% if target %}
-            <div style="margin-top: 40px; border-top: 1px dotted #30363d; padding-top: 30px;">
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px;">
-                    <h2 style="margin: 0;">Audit Findings: {{ target }} </h2>
-                    
-                    <div style="display: flex; gap: 20px; align-items: center;">
-                        <!-- Updated Logic for Security Score Visualization -->
-                        {% if history %}
-                        <div style="font-size: 0.9em; color: #8b949e;"> 
-                            SYSTEM HEALTH SCORE: <span class="score-badge">{{ history[0].security_score }} / 100</span>
-                        </div>
-                        {% endif %}
-                        
-                        {% if results %}
-                            <a href="/download" style="color: #58a6ff; text-decoration: none; font-size: 0.9em; border: 1px solid #58a6ff; padding: 5px 12px; border-radius: 6px;">Download Raw Data</a>
-                        {% endif %}
-                    </div>
+            <div style="margin-top: 40px; border-top: 1px solid #30363d; padding-top: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <h2 style="margin: 0;">Live Scan View: <span style="color: #58a6ff;">{{ target }}</span></h2>
+                    {% if results %}
+                        <a href="/download" style="color: #58a6ff; text-decoration: none; font-size: 0.9em; border-bottom: 1px dotted #58a6ff;">Raw Download (.TXT)</a>
+                    {% endif %}
                 </div>
                 
                 {% for report in results %}
                     <div class="result-box">{{ report }}</div>
                 {% endfor %}
+                
+                {% if not results %}
+                    <div class="result-box" style="border-left: 5px solid #ff7b72;">Scan complete. No vulnerabilities found in selected range.</div>
+                {% endif %}
             </div>
         {% endif %}
     </div>
 
     <script>
+        // Controller for dynamic custom port visibility
         function togglePorts() {
             var mode = document.getElementById("scan_mode").value;
-            document.getElementById("custom-fields").style.display = mode === "custom" ? "flex" : "none";
+            var customDiv = document.getElementById("custom-fields");
+            customDiv.style.display = mode === "custom" ? "flex" : "none";
         }
 
+        // Logic for auto-fading system messages
         setTimeout(function() {
             const alerts = document.querySelectorAll('.flask-msg');
             alerts.forEach(alert => {
-                alert.style.transition = "opacity 0.6s";
+                alert.style.transition = "opacity 0.6s, transform 0.6s";
                 alert.style.opacity = "0";
+                alert.style.transform = "translateX(40px)";
                 setTimeout(() => alert.remove(), 600);
             });
-        }, 7000); 
+        }, 6000); 
     </script>
 </body>
 </html>
