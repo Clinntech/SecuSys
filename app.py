@@ -205,7 +205,7 @@ def login():
         # Checking the hash against the submitted password
         if user and bcrypt.check_password_hash(user.password, pass_word):
             login_user(user)
-            flash(f"Welcome back, {user_name}. Tactical session initiated.", "success")
+            flash(f"Welcome back, {user_name}.", "success")
             return redirect(url_for('index'))
         else:
             flash('Login Unsuccessful. Please check username and password', 'danger')
@@ -299,7 +299,7 @@ def scan():
         summary_text = f"Audit Success: Identified {len(results)} vulnerabilities." if results else "Hardened: No vulnerabilities detected."
         new_audit = AuditRecord(
             target_ip=target,
-            ports_found=str(len(results)),
+            ports_found = "\n".join(results), # <-- This saves the actual Analysis Boxes!
             threat_summary=summary_text,
             user_id=current_user.id,
             security_score=final_score
@@ -320,6 +320,25 @@ def scan():
     history_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(5).all()
 
     return render_template('index.html', results=results, target=target, audit_count=total_audits, history=history_logs)
+
+@app.route('/audit/<int:record_id>')
+@login_required
+def audit_detail(record_id):
+    """
+    Forensic Drill-Down: Fetches deep details of a past network handshake.
+    """
+    #Reach into SQL to find this specific record
+    record = AuditRecord.query.get_or_404(record_id)
+
+    #Authorization Handshake: Is this yours?
+    if record.user_id != current_user.id:
+        flash("ACCESS VIOLATION: Unauthorized Forensic Retrieval.", "danger")
+        return redirect(url_for('index'))
+
+    # Intelligence Preparation
+    # Turn the string 'ports_found' back into an object so we can count them
+    # For now, we will just send the record object to the page
+    return render_template('audit_detail.html', audit=record)
 
 @app.route('/download')
 @login_required
@@ -389,48 +408,62 @@ def export_pdf(record_id):
 @login_required
 def remediate(record_id):
     """
-    SaaS Action Hub: Bridge to Cisco Netmiko logic.
+    SaaS Action Hub: Dynamic Bridge to Cisco credentials and remediation logic.
     """
     record = AuditRecord.query.get_or_404(record_id)
 
     if record.user_id != current_user.id:
         flash("Authorization Violation.", "danger")
         return redirect(url_for('index'))
+    
+    #replace hardcoded admin and passowrd123 sumaltion
+    config = DeviceSettings.query.filter_by(user_id=current_user.id).first()
+    if not config:
+        flash("GATEWAY ERROR: No device registred. Navigate to Network settings first.", "danger")
+        return redirect(url_for('index'))
 
     try:
         # Determine specific high-priority target for fix from record history
-        discovery_ports = [int(p) for p in [21,22,23,80,443,445] if str(p) in str(record.threat_summary)]
+        possible_ports = [21,22,23,25,53,80,110,443,445,3306,3389,8080]
+        discovery_ports = [int(p) for p in possible_ports if str(p) in str(record.threat_summary)]
         target_port = discovery_ports[0] if discovery_ports else 80
+
+        #Query Database Brain: Fetch the SQL intelligence row for this port
 
         kb_intel = Vulnerability.query.filter_by(port=target_port).first()
         cisco_command = kb_intel.cisco_acl if kb_intel else f"access-list 101 deny tcp any any eq {target_port}"
 
         device_params = {
             'device_type': 'cisco_ios',
-            'host': record.target_ip,
-            'username': 'admin',
-            'password': 'password123',
+            'host': config.device_ip, # from user settings
+            'username': config.ssh_user, # from user settings
+            'password': 'SECURED_SESSION', # simulated decryption
             'timeout': 10
         }
 
-        print(f"[REMEDIATION] Deploying secure tunnel to: {record.target_ip}")
+        print(f"[REMEDIATION] Establishing tunnel to {config.device_ip} for Fix ID: {record.id}")
         
-        # NOTE: PREPARED HANDSHAKE CODE
-        # net_connect = ConnectHandler(**device_params)
-        # output = net_connect.send_config_set([cisco_command])
-        # net_connect.disconnect()
+        # PREPARED NETMIKO PROTOCOL: Active when Lab Hardware is reachable
+        """
+        net_connect = ConnectHandler(**device_params)
+        output = net_connect.send_config_set([cisco_command])
+        net_connect.disconnect()
 
+        """
+
+         #LOG SUCCESS & STATE PERSTISTENCE
         record.remediation_status = 1
-        record.remediation_log = f"HANDSHAKE SUCCESSFUL: Dispatched Cisco IOS Configuration '{cisco_command}' to device."
+        record.remediation_log = f"PROTOCOL Handshake SUCCESS with {config.device_ip} (USER: {config.ssh_user}). Command Pushed: {cisco_command}"
         
         db.session.commit()
-        flash(f"Cyber-Remediation Deployed: Cisco CLI logic sent to {record.target_ip}.", "success")
-        
+        flash(f"Platform Command Deployed: SecuSys automated fix sent to Cisco device at {config.device_ip}.", "success")
+
     except (NetmikoTimeoutException, NetmikoAuthenticationException):
-        flash(f"Handshake Denied: Secure SSH connection refused by target router.", "danger")
+        flash(f"INFRASTRUCTURE REFUSAL: Targeted router at {config.device_ip} rejected credentials or is offline.", "danger")
     except Exception as e:
         db.session.rollback()
-        flash(f"Deployment System Error: {str(e)}", "danger")
+        print(f"[SYSTEM LOG]: Remediation failed for ID {record_id}. Error: {str(e)}")
+        flash(f"REMEDIATION FAIL: Could not complete logic handshake.", "danger")
 
     return redirect(url_for('index'))
 

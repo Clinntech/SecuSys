@@ -113,7 +113,10 @@
                         <tr>
                             <td style="color: #8b949e; font-size: 0.8em;">{{ audit.scan_date.strftime('%m-%d-%Y | %H:%M') }}</td>
                             <td>
-                                <strong style="color: #c9d1d9; font-family: monospace;">{{ audit.target_ip }}</strong> 
+                                <!-- STARTUP UPDATE: Integrated Forensic Link for IP Discovery -->
+                                <a href="{{ url_for('audit_detail', record_id=audit.id) }}" style="color: #58a6ff; text-decoration: none; font-weight: bold; font-family: monospace; border-bottom: 1px dotted transparent;" onmouseover="this.style.borderBottom='1px dotted #58a6ff'" onmouseout="this.style.borderBottom='none'">
+                                    {{ audit.target_ip }}
+                                </a>
                                 <a href="{{ url_for('export_pdf', record_id=audit.id) }}" class="pdf-link">Download PDF Audit</a>
                             </td>
                             <td>
@@ -133,12 +136,6 @@
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
-                {% if not history %}
-                <p style="text-align: center; padding: 30px; color: #8b949e;"><em>Awaiting telemetry data... no previous audits identified for this account.</em></p>
-                {% endif %}
-            </div>
-        </div>
 
         <!-- Dynamic Results Console -->
         {% if target %}

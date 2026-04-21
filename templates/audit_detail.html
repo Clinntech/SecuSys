@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Detail | {{ audit.target_ip }}</title>
+    <style>
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, system-ui, sans-serif; padding: 40px 20px; line-height: 1.6; margin: 0; }
+        .container { max-width: 900px; margin: auto; background: #161b22; border: 1px solid #30363d; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);}
+        
+        .report-header { background: #1c2128; padding: 25px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+        h1 { color: #58a6ff; font-size: 1.3rem; margin: 0; }
+        .badge { background: rgba(88, 166, 255, 0.1); color: #58a6ff; padding: 4px 10px; border-radius: 6px; font-size: 0.8em; border: 1px solid #58a6ff; font-family: monospace; }
+
+        .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: #30363d; border-bottom: 1px solid #30363d; }
+        .info-item { background: #161b22; padding: 20px; }
+        .label { color: #8b949e; text-transform: uppercase; font-size: 0.7rem; font-weight: bold; margin-bottom: 5px; }
+        .value { color: #f0f6fc; font-family: monospace; }
+
+        .status-secured { color: #3fb950; font-weight: bold; }
+        .status-danger { color: #f85149; font-weight: bold; }
+
+        .section { padding: 25px; }
+        h3 { color: #8b949e; font-size: 0.85em; text-transform: uppercase; margin-bottom: 15px; }
+        
+        .terminal { 
+            background: #010409; 
+            color: #d1d5da; 
+            padding: 20px; 
+            border-radius: 8px; 
+            border: 1px solid #30363d; 
+            font-family: 'Courier New', monospace; 
+            font-size: 0.85em; 
+            white-space: pre-wrap; 
+        }
+
+        .remediation-box { 
+            background: rgba(35, 134, 54, 0.05); 
+            border-left: 4px solid #238636; 
+            padding: 15px; 
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .footer { padding: 20px; text-align: center; border-top: 1px solid #30363d; }
+        .back-link { color: #8b949e; text-decoration: none; font-size: 0.85em; }
+        .back-link:hover { color: #58a6ff; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 1. Header -->
+        <div class="report-header">
+            <h1>Infrastructure Audit Summary</h1>
+            <span class="badge">LOG#{{ audit.id }}</span>
+        </div>
+
+        <!-- 2. Data Points -->
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="label">Target Infrastructure</div>
+                <div class="value" style="color:#58a6ff;">{{ audit.target_ip }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Timestamp</div>
+                <div class="value">
+                    {% if audit.scan_date %}{{ audit.scan_date.strftime('%Y-%m-%d %H:%M') }}{% else %}N/A{% endif %} UTC
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="label">Platform Security Status</div>
+                <div class="value">
+                    {% if audit.remediation_status == 1 %}
+                        <span class="status-secured">HANDSHAKE SECURED</span>
+                    {% else %}
+                        <span class="status-danger">THREAT DETECTED</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="label">Trace Integrity</div>
+                <div class="value">Verified Log</div>
+            </div>
+        </div>
+
+        <!-- 3. Audit Findings -->
+        <div class="section">
+            <h3>Forensic Scan Data</h3>
+            <div class="terminal">{{ audit.ports_found if audit.ports_found and audit.ports_found != 'None' else 'Detailed telemetry purged.' }}</div>
+        </div>
+
+        <!-- 4. Active Logs (Hidden if not remediated) -->
+        {% if audit.remediation_status == 1 %}
+        <div class="section" style="border-top: 1px solid #30363d;">
+            <h3>Active Mitigation Logs</h3>
+            <div class="remediation-box">
+                <span style="color: #2ea043;">SUCCESS:</span> {{ audit.remediation_log }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 5. Return -->
+        <div class="footer">
+            <a href="/" class="back-link">← Return to Dashboard</a>
+        </div>
+    </div>
+
+</body>
+</html>
