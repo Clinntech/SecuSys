@@ -52,7 +52,7 @@
           {% if messages %}
             {% for category, message in messages %}
               <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} flask-msg">
-                <strong>ALERT:</strong> {{ message }}
+                {{ message }}
               </div>
             {% endfor %}
           {% endif %}
@@ -72,7 +72,7 @@
         
         <!-- Social Proof Stats -->
         <div class="status-feed">
-            📡 ANALYTICS: {{ audit_count }} total forensic network audits have been executed on the platform.
+            {{ audit_count }} total forensic network audits have been executed on the platform.
         </div>
 
         <!-- Scanning Command Center -->
@@ -86,7 +86,7 @@
                         <option value="well-known">Well-known Audit (1-1024)</option>
                         <option value="custom">Custom Range Audit</option>
                     </select>
-                    <button type="submit">EXECUTE SCAN</button>
+                    <button type="submit">SCAN</button>
                 </div>
                 <div id="custom-fields" class="input-group">
                     <input type="number" name="start_port" placeholder="Starting Port">

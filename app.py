@@ -310,7 +310,7 @@ def scan():
         if results:
             save_report_to_file(ip, results)
         
-        flash(f"Scan Process Completed: Network hardening score at {final_score}%", "success")
+        flash(f"Scan Complete: Network hardening score at {final_score}%", "success")
 
     except Exception as e:
         db.session.rollback()
