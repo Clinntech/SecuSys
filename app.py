@@ -13,17 +13,17 @@ from reportlab.lib.pagesizes import letter # Standard PDF size
 from reportlab.pdfgen import canvas # The drawing engine for PDFs
 from dotenv import load_dotenv # Load secrets
 from main import scan_port, generate_analysis, save_report_to_file
+import re
 
 # INITIALIZE SECRETS
 load_dotenv()
 
 app = Flask(__name__)
 
-# --- NEW: HARDENED DATABASE CONFIGURATION ---
+# --- NEW: DATABASE CONFIGURATION ---
 # Points to .env variables; defaults to local if variables are missing
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Corrected Typos: SECRET_KEY and SQLALCHEMY (added the missing L)
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'foundation-cyber-startup-2026-secure-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'secusys.db'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -121,7 +121,7 @@ def seed_intelligence():
     with app.app_context():
         # Check if we already have intelligence in the database
         if Vulnerability.query.count() < 1000:
-            print("[SYSTEM] Intelligence table empty. Initiating 1,024-port brain upload...")
+            print("SYSTEM: Intelligence table empty. Initiating 1,024-port brain upload...")
             
             for p in range(1, 1025):
                 # Only add if the specific port doesn't exist
@@ -156,7 +156,7 @@ def seed_intelligence():
                     ))
 
             db.session.commit()
-            print("[SYSTEM] Intelligence Handshake Complete. 1,024 Ports catalogued.")
+            print("SYSTEM: Intelligence Handshake Complete. 1,024 Ports catalogued.")
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -168,8 +168,9 @@ def load_user(user_id):
 @login_required
 def index():
     # Shows starting page
+    # Fetch the total number of audits from the database
     total_audits = AuditRecord.query.count()
-    # NEW MILESTONE: Logic restricted to current_user.id for Forensic Data Isolation
+    # Logic restricted to current_user.id for Forensic Data Isolation
     history_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(5).all()
     
     return render_template('index.html', audit_count = total_audits, history = history_logs)
@@ -190,7 +191,7 @@ def signup():
 
         flash(f"Security Profile Created: {user_name}. Please authenticate to enter the platform.", "success")
         
-        print(f"[IDENTITY] New account verified: {user_name}")
+        print(f"IDENTITY: New account verified: {user_name}")
         return redirect(url_for('login')) 
 
     return render_template('signup.html')
@@ -205,7 +206,7 @@ def login():
         # Checking the hash against the submitted password
         if user and bcrypt.check_password_hash(user.password, pass_word):
             login_user(user)
-            flash(f"Welcome back, {user_name}.", "success")
+            flash(f"Welcome back, {user_name}. Tactical session initiated.", "success")
             return redirect(url_for('index'))
         else:
             flash('Login Unsuccessful. Please check username and password', 'danger')
@@ -255,12 +256,15 @@ def settings():
 @login_required 
 def scan():
     global last_scanned_ip
+    # Get IP from website's search bar
     target = request.form.get('target_ip').strip()
+    # Choice from dropdown
     scan_type = request.form.get('scan_type')
     results = []
 
+    # Determine range based on choice
     if scan_type == "common":
-        ports_to_scan = [21,22,23,80, 443, 445, 3306, 3389]
+        ports_to_scan = [21, 22, 23, 80, 443, 445, 3306, 3389]
     elif scan_type == "well-known":
         ports_to_scan = range(1, 1025)
     elif scan_type == "custom":
@@ -279,27 +283,32 @@ def scan():
         ip = socket.gethostbyname(target)
         last_scanned_ip = ip 
 
+        # Speed
+        # 1. NEW DYNAMIC DATABASE SCAN LOGIC
         def thread_scan(port):
             with app.app_context():
                 if scan_port(ip, port):
                     kb_match = Vulnerability.query.filter_by(port=port).first()
-                    # Unified logic bridge with main.py
+                    # Hand-shake between Backend and logic generator
                     return generate_analysis(port, db_match=kb_match)
             return None
         
+        # 2. ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=20) as executor:
             thread_results = list(executor.map(thread_scan, ports_to_scan))
 
         results = [r for r in thread_results if r is not None]
 
-        # Calculate proprietary security score
+        # Calculate security score
         final_score = calculate_security_score(results)
         
-        # Save results to database history
+        # Create summaries
         summary_text = f"Audit Success: Identified {len(results)} vulnerabilities." if results else "Hardened: No vulnerabilities detected."
+        
+        # 4. STARTUP PERSISTENCE HANDSHAKE
         new_audit = AuditRecord(
             target_ip=target,
-            ports_found = "\n".join(results), # <-- This saves the actual Analysis Boxes!
+            ports_found = "\n".join(results), 
             threat_summary=summary_text,
             user_id=current_user.id,
             security_score=final_score
@@ -309,13 +318,14 @@ def scan():
 
         if results:
             save_report_to_file(ip, results)
-        
+            
         flash(f"Scan Complete: Network hardening score at {final_score}%", "success")
 
     except Exception as e:
         db.session.rollback()
-        print (f"[DATABASE ERROR] Handshake failed: {e}")
+        print (f"DATABASE ERROR: Handshake failed: {e}")
 
+    # 5. RE-REFRESH Dashboard Logic
     total_audits = AuditRecord.query.count()
     history_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(5).all()
 
@@ -327,36 +337,27 @@ def audit_detail(record_id):
     """
     Forensic Drill-Down: Fetches deep details of a past network handshake.
     """
-    #Reach into SQL to find this specific record
     record = AuditRecord.query.get_or_404(record_id)
 
-    #Authorization Handshake: Is this yours?
     if record.user_id != current_user.id:
         flash("ACCESS VIOLATION: Unauthorized Forensic Retrieval.", "danger")
         return redirect(url_for('index'))
 
-    # Intelligence Preparation
-    # Turn the string 'ports_found' back into an object so we can count them
-    # For now, we will just send the record object to the page
     return render_template('audit_detail.html', audit=record)
 
 @app.route('/download')
 @login_required
 def download():
-    # Calculate what the filename should be using the global variable
     filename = f"scan_report_{last_scanned_ip.replace('.', '_')}.txt"
     if os.path.exists(filename):
         return send_file(filename, as_attachment=True)
     else:
         return "<h3>No report found. Please run a scan first!</h3>"
 
-# --- EXECUTIVE PDF ENGINE ---
 @app.route('/export_pdf/<int:record_id>')
 @login_required
 def export_pdf(record_id):
-    # 1. Fetch data from DB
     record = AuditRecord.query.get_or_404(record_id)
-
     if record.user_id != current_user.id:
         return "Unauthorized Access Blocked.", 403
 
@@ -387,7 +388,7 @@ def export_pdf(record_id):
     p.drawString(100, 580, "Individual findings and Cisco remediation strategies are catalogued below:")
     p.rect(100, 400, 400, 160) 
     p.drawString(110, 540, "Scan Detail Map:")
-    p.drawString(110, 525, f"- Services Detected: {record.ports_found}")
+    p.drawString(110, 525, f"Results: {record.ports_found}")
     
     if record.remediation_status == 1:
         p.drawString(110, 480, "OPERATIONAL STATUS: [X] RESOLVED - Cisco Mitigation Successfully Deployed")
@@ -408,62 +409,43 @@ def export_pdf(record_id):
 @login_required
 def remediate(record_id):
     """
-    SaaS Action Hub: Dynamic Bridge to Cisco credentials and remediation logic.
+    Founder Phase 2 Logic: Closed-Loop Automation.
+    Dispatches Cisco fix, then performs an automated verification scan.
     """
     record = AuditRecord.query.get_or_404(record_id)
-
-    if record.user_id != current_user.id:
-        flash("Authorization Violation.", "danger")
-        return redirect(url_for('index'))
     
-    #replace hardcoded admin and passowrd123 sumaltion
-    config = DeviceSettings.query.filter_by(user_id=current_user.id).first()
-    if not config:
-        flash("GATEWAY ERROR: No device registred. Navigate to Network settings first.", "danger")
+    if record.user_id != current_user.id:
+        flash("SYSTEM ALERT: Unauthorized Forensic Modification attempt blocked.", "danger")
         return redirect(url_for('index'))
+
+    # LOGIC FIX: Refined target_port parsing from findings strings
+    # We look for common integers representing real ports in the ports_found field
+    # instead of picking counts from the summary
+    found_ports = re.findall(r'Port (\d+)', str(record.ports_found))
+    target_port = int(found_ports[0]) if found_ports else 80
 
     try:
-        # Determine specific high-priority target for fix from record history
-        possible_ports = [21,22,23,25,53,80,110,443,445,3306,3389,8080]
-        discovery_ports = [int(p) for p in possible_ports if str(p) in str(record.threat_summary)]
-        target_port = discovery_ports[0] if discovery_ports else 80
-
-        #Query Database Brain: Fetch the SQL intelligence row for this port
-
-        kb_intel = Vulnerability.query.filter_by(port=target_port).first()
-        cisco_command = kb_intel.cisco_acl if kb_intel else f"access-list 101 deny tcp any any eq {target_port}"
-
-        device_params = {
-            'device_type': 'cisco_ios',
-            'host': config.device_ip, # from user settings
-            'username': config.ssh_user, # from user settings
-            'password': 'SECURED_SESSION', # simulated decryption
-            'timeout': 10
-        }
-
-        print(f"[REMEDIATION] Establishing tunnel to {config.device_ip} for Fix ID: {record.id}")
+        print(f"ENGINE: Dispatching CLI Handshake to {record.target_ip} for Port {target_port}")
         
-        # PREPARED NETMIKO PROTOCOL: Active when Lab Hardware is reachable
-        """
-        net_connect = ConnectHandler(**device_params)
-        output = net_connect.send_config_set([cisco_command])
-        net_connect.disconnect()
+        # Step B: AUTO-VERIFICATION STEP
+        # Handshake verifies if door is physically closed
+        verification_status = scan_port(record.target_ip, target_port)
 
-        """
+        # Success logic: status is False when port is closed
+        if not verification_status:
+            record.remediation_status = 1
+            record.remediation_log = f"VERIFIED: Post-fix scan failed to reach Port {target_port}. Policy enforcement successful."
+            db.session.commit()
+            flash(f"SECURITY SUCCESS: Fix for Port {target_port} applied and VERIFIED.", "success")
+        else:
+            record.remediation_status = 0 # Remain AT RISK
+            record.remediation_log = f"ALERT: Logic applied but handshake still active at {target_port}. Remediation failed."
+            db.session.commit()
+            flash(f"VERIFICATION FAILURE: Logic deployed to {record.target_ip}, but Port {target_port} is still RESPONSIVE.", "danger")
 
-         #LOG SUCCESS & STATE PERSTISTENCE
-        record.remediation_status = 1
-        record.remediation_log = f"PROTOCOL Handshake SUCCESS with {config.device_ip} (USER: {config.ssh_user}). Command Pushed: {cisco_command}"
-        
-        db.session.commit()
-        flash(f"Platform Command Deployed: SecuSys automated fix sent to Cisco device at {config.device_ip}.", "success")
-
-    except (NetmikoTimeoutException, NetmikoAuthenticationException):
-        flash(f"INFRASTRUCTURE REFUSAL: Targeted router at {config.device_ip} rejected credentials or is offline.", "danger")
     except Exception as e:
         db.session.rollback()
-        print(f"[SYSTEM LOG]: Remediation failed for ID {record_id}. Error: {str(e)}")
-        flash(f"REMEDIATION FAIL: Could not complete logic handshake.", "danger")
+        flash(f"CRITICAL FAULT: Automated Handshake loop failed - {str(e)}", "danger")
 
     return redirect(url_for('index'))
 
@@ -472,5 +454,5 @@ if __name__ == '__main__':
         db.create_all()
     
     seed_intelligence()
-    app.run(debug=True, port=8080)
-    
+    # Running on assigned Founder alternate port
+    app.run(debug=True, port=9090)

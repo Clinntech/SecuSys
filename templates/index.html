@@ -54,7 +54,7 @@
           {% if messages %}
             {% for category, message in messages %}
               <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} flask-msg">
-                <strong>[SECUSYS]:</strong> {{ message }}
+                 {{ message }}
               </div>
             {% endfor %}
           {% endif %}
@@ -137,11 +137,11 @@
                                     </div>
                                 {% elif "Identified" in audit.threat_summary %}
                                     <div style="background: rgba(248, 81, 73, 0.1); border: 1px solid #f85149; color: #ff7b72; padding: 6px 12px; border-radius: 6px; font-size: 0.8em; font-weight: bold; display: flex; align-items: center; gap: 8px;">
-                                        <span style="font-size: 1.1em;">⚠️</span> AT RISK: ACTION REQUIRED
+                                        <span style="font-size: 1.1em;"></span> AT RISK: ACTION REQUIRED
                                     </div>
                                 {% else %}
                                     <div style="background: rgba(35, 134, 54, 0.1); border: 1px solid #238636; color: #3fb950; padding: 6px 12px; border-radius: 6px; font-size: 0.8em; font-weight: bold; display: flex; align-items: center; gap: 8px;">
-                                        🛡️ SYSTEM HARDENED
+                                        SYSTEM HARDENED
                                     </div>
                                 {% endif %}
                             </td>
