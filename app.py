@@ -131,18 +131,30 @@ def load_user(user_id):
 @app.route('/')
 @login_required
 def index():
-    # DASHBOARD HUD LOGIC
-    total_audits = AuditRecord.query.count()
+    audit_count = AuditRecord.query.count()
+    # Pull up to 10 latest logs
     history_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(10).all()
     
-    # 1. Infrastructure Assets Count (Unique IPs)
+    # 1. ASSET ANALYTICS
     user_scans = AuditRecord.query.filter_by(user_id=current_user.id).all()
     unique_assets = len(set([s.target_ip for s in user_scans]))
-
-    # 2. Unresolved High-Risks Count (Vulnerabilities detected but not remediated)
     unresolved = AuditRecord.query.filter_by(user_id=current_user.id, remediation_status=0).filter(AuditRecord.threat_summary.like('%Identified%')).count()
 
-    return render_template('index.html', audit_count=total_audits, history=history_logs, assets_count=unique_assets, risks_count=unresolved)
+    # 2. --- NEW THURSDAY UPDATE: CHART DATA PREP ---
+    # We grab scores in chronological order (oldest to newest) to show a trend line
+    trend_scans = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.asc()).limit(10).all()
+    
+    # Extract data for the Javascript Chart
+    dates = [s.scan_date.strftime("%d/%m") for s in trend_scans]
+    scores = [s.security_score for s in trend_scans]
+
+    return render_template('index.html', 
+                           audit_count=audit_count, 
+                           history=history_logs, 
+                           assets_count=unique_assets, 
+                           risks_count=unresolved,
+                           chart_dates=dates,    # Pass to UI
+                           chart_scores=scores)  # Pass to UI
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -239,7 +251,7 @@ def scan():
         db.session.add(new_audit)
         db.session.commit() 
         if results: save_report_to_file(ip, results)
-        flash(f"Protocol Complete: Hardening score at {final_score}%", "success")
+        flash(f"Hardening score at {final_score}%", "success")
 
     except Exception as e:
         db.session.rollback()
@@ -310,7 +322,7 @@ def remediate(record_id):
             record.remediation_status = 1
             record.remediation_log = f"VERIFIED: Post-fix scan failed. Policy successful."
             db.session.commit()
-            flash(f"SUCCESS: Fix for Port {target_port} applied and VERIFIED.", "success")
+            flash(f"System fix applied and verified.", "success")
         else:
             record.remediation_status = 0 
             record.remediation_log = f"ALERT: Logic applied but port {target_port} responsive."
