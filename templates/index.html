@@ -60,7 +60,7 @@
           {% if messages %}
             {% for category, message in messages %}
               <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} flask-msg">
-                <strong>[SECUSYS]:</strong> {{ message }}
+                 {{ message }}
               </div>
             {% endfor %}
           {% endif %}
