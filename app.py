@@ -8,7 +8,8 @@ from flask_bcrypt import Bcrypt
 from datetime import datetime
 import socket
 import os
-import io # Needed for PDF memory management
+import io # Needed for PDF and CSV memory management
+import csv # NEW: Standard library for enterprise data exports
 from reportlab.lib.pagesizes import letter # Standard PDF size
 from reportlab.pdfgen import canvas # The drawing engine for PDFs
 from dotenv import load_dotenv # Load secrets
@@ -109,7 +110,7 @@ def load_user(user_id):
 @login_required
 def index():
     audit_total = AuditRecord.query.count()
-    user_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(10).all()
+    user_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(15).all()
     assets, risks = get_dashboard_hud(current_user.id)
     return render_template('index.html', audit_count=audit_total, history=user_logs, assets_count=assets, risks_count=risks)
 
@@ -164,7 +165,6 @@ def scan():
     target, s_type = request.form.get('target_ip').strip(), request.form.get('scan_type')
     results = []
 
-    # Map Audit Modes to Engine
     if s_type == "common": p_range = [21, 22, 23, 80, 443, 445, 3306, 3389]
     elif s_type == "well-known": p_range = range(1, 1025)
     elif s_type == "custom":
@@ -205,19 +205,22 @@ def scan():
         db.session.rollback()
         print (f"FATAL LOGIC ERROR: {e}")
 
-    # Synchronized Dashboard View Variables
     f_total = AuditRecord.query.count()
     f_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(10).all()
     f_assets, f_risks = get_dashboard_hud(current_user.id)
 
     return render_template('index.html', results=results, target=target, audit_count=f_total, history=f_logs, assets_count=f_assets, risks_count=f_risks)
 
+@app.route('/audit/<int:record_id>')
+@login_required
+def audit_detail(record_id):
+    record = AuditRecord.query.get_or_404(record_id)
+    if record.user_id != current_user.id: return redirect(url_for('index'))
+    return render_template('audit_detail.html', audit=record)
+
 @app.route('/delete_audit/<int:record_id>', methods=['POST'])
 @login_required
 def delete_audit(record_id):
-    """
-    Forensic Purge Logic: Authorized removal of security telemetry records.
-    """
     record = AuditRecord.query.get_or_404(record_id)
     if record.user_id != current_user.id:
         flash("VIOLATION: Purge denied for non-owned asset record.", "danger")
@@ -230,13 +233,6 @@ def delete_audit(record_id):
         db.session.rollback()
         flash("DATABASE ERROR: Handshake failed during deletion logic.", "danger")
     return redirect(url_for('index'))
-
-@app.route('/audit/<int:record_id>')
-@login_required
-def audit_detail(record_id):
-    record = AuditRecord.query.get_or_404(record_id)
-    if record.user_id != current_user.id: return redirect(url_for('index'))
-    return render_template('audit_detail.html', audit=record)
 
 @app.route('/download')
 @login_required
@@ -263,19 +259,33 @@ def export_pdf(record_id):
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name=f"SecuSys_Report_{record.target_ip}.pdf", mimetype='application/pdf')
 
+# --- MONDAY UPDATE: INVENTORY CSV EXPORT ---
+@app.route('/export_inventory')
+@login_required
+def export_inventory():
+    """
+    Corporate Reporting: Streams the user's complete audit history into CSV.
+    """
+    records = AuditRecord.query.filter_by(user_id=current_user.id).all()
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(['RecordID', 'Infrastructure_Target', 'Timestamp_UTC', 'Integrity_Score', 'Summary_Status'])
+    
+    for r in records:
+        writer.writerow([r.id, r.target_ip, r.scan_date, r.security_score, r.threat_summary])
+    
+    mem_file = io.BytesIO()
+    mem_file.write(buffer.getvalue().encode('utf-8'))
+    mem_file.seek(0)
+    return send_file(mem_file, as_attachment=True, download_name=f"SecuSys_Inventory_{current_user.username}.csv", mimetype='text/csv')
+
 @app.route('/remediate/<int:record_id>', methods=['POST'])
 @login_required
 def remediate(record_id):
-    """
-    Closed-Loop Handshake: Probe verification of automated remediation status.
-    """
     record = AuditRecord.query.get_or_404(record_id)
     if record.user_id != current_user.id: return redirect(url_for('index'))
-    
-    # Surgical Regex to pull specific port target from log persistence
     p_hits = re.findall(r'Port (\d+)', str(record.ports_found))
     p_num = int(p_hits[0]) if p_hits else 80
-    
     try:
         handshake_active = scan_port(record.target_ip, p_num)
         if not handshake_active:
@@ -283,24 +293,22 @@ def remediate(record_id):
             db.session.commit()
             flash(f"REMEDIATION SUCCESS: Automated fix for Port {p_num} verified secure.", "success")
         else:
-            record.remediation_status, record.remediation_log = 0, "ALARM: Policy conflict. Handshake responsive post-deployment."
+            record.remediation_status, record.remediation_log = 0, "ALARM: Policy conflict detected."
             db.session.commit()
-            flash(f"VERIFICATION FAILURE: Logic deployed but target is still responsive.", "danger")
+            flash(f"VERIFICATION FAILURE: Logic deployed but target remains responsive.", "danger")
     except Exception:
         db.session.rollback(); flash("PROTOCOL FAULT: Automated Handshake interrupted.", "danger")
     return redirect(url_for('index'))
 
 def seed_intelligence():
-    """ Self-Healing Knowledge Base seeding function """
     with app.app_context():
         if Vulnerability.query.count() < 1000:
-            print("System Check: Loading SaaS Vulnerability intelligence...")
             for p in range(1, 1025):
                 if not Vulnerability.query.filter_by(port=p).first():
                     try: nm = socket.getservbyport(p).upper()
-                    except: nm = "UNMAPPED-PROFILE"
-                    risk, fix = ("HIGH", "Immediate Security Review") if p in [21, 23, 25] else ("LOW", "Standard Monitor")
-                    db.session.add(Vulnerability(port=p, service=nm, risk=risk, description=f"Handshake at port {p}.", fix=fix, cisco_acl=f"access-list 101 deny tcp any any eq {p}"))
+                    except: nm = "DYNAMIC-PROFILE"
+                    risk = "HIGH" if p in [21, 23, 25] else "LOW"
+                    db.session.add(Vulnerability(port=p, service=nm, risk=risk, description=f"Audit handshake port {p}", fix="Manual check suggested", cisco_acl=f"access-list 101 deny tcp any any eq {p}"))
             db.session.commit()
 
 if __name__ == '__main__':
