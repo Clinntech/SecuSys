@@ -2,33 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SecuSys | Network Integration</title>
+    <title>SecuSys | Infrastructure Bridge</title>
     <style>
-        body { background: #0d1117; color: #c9d1d9; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .config-card { background: #161b22; border: 1px solid #30363d; padding: 40px; border-radius: 12px; width: 400px; }
-        h1 { color: #58a6ff; font-size: 1.4rem; margin-bottom: 25px; border-bottom: 1px solid #30363d; padding-bottom: 10px; }
-        label { font-size: 0.8em; color: #8b949e; display: block; margin-bottom: 5px; }
-        input { width: 93%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; }
-        button { width: 100%; padding: 12px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px;}
-        .back-link { display: block; text-align: center; margin-top: 20px; color: #8b949e; text-decoration: none; font-size: 0.85em; }
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .config-card { background: #161b22; border: 1px solid #30363d; padding: 40px; border-radius: 12px; width: 450px; }
+        h1 { color: #58a6ff; font-size: 1.2rem; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin-bottom: 25px; letter-spacing: 1px;}
+        label { display: block; font-size: 0.75rem; color: #8b949e; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;}
+        input, select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s;}
+        button:hover { background: #2ea043; }
+        .back-link { display: block; text-align: center; margin-top: 25px; color: #8b949e; text-decoration: none; font-size: 0.8rem; }
     </style>
 </head>
 <body>
     <div class="config-card">
-        <h1>Router Integration</h1>
+        <h1>Infrastructure Onboarding</h1>
         <form method="POST">
-            <label>Cisco Device IP (Target for remediation)</label>
-            <input type="text" name="device_ip" value="{{ config.device_ip if config else '' }}" placeholder="192.168.1.1" required>
+            <label>Management Gateway Brand</label>
+            <select name="device_platform">
+                <option value="cisco_ios" {% if config and config.device_platform == 'cisco_ios' %}selected{% endif %}>Cisco IOS/XE</option>
+                <option value="linux" {% if config and config.device_platform == 'linux' %}selected{% endif %}>Linux Firewalls (iptables)</option>
+                <option value="juniper_junos" {% if config and config.device_platform == 'juniper_junos' %}selected{% endif %}>Juniper Junos OS</option>
+            </select>
+
+            <label>Infrastructure Target IP (Auditor Bridge)</label>
+            <input type="text" name="device_ip" value="{{ config.device_ip if config else '' }}" placeholder="IP or Hostname" required>
             
-            <label>SSH Management Username</label>
-            <input type="text" name="ssh_user" value="{{ config.ssh_user if config else '' }}" placeholder="admin" required>
+            <label>Administrative Management User</label>
+            <input type="text" name="ssh_user" value="{{ config.ssh_user if config else '' }}" placeholder="User Access" required>
             
-            <label>SSH Password (Encryption Enabled)</label>
-            <input type="password" name="ssh_password" placeholder="••••••••" required>
+            <label>Master Pass-Phrase (Encrypted Vault)</label>
+            <input type="password" name="ssh_password" placeholder="Pass-key" required>
             
-            <button type="submit">Establish Secure Bridge</button>
+            <button type="submit">Finalize Connection Settings</button>
         </form>
-        <a href="/" class="back-link">Return to Command Center</a>
+        <a href="/" class="back-link">Return to Core Dashboard</a>
     </div>
 </body>
 </html>
