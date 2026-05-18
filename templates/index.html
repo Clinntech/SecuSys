@@ -6,7 +6,7 @@
     <title>SecuSys Dashboard | Enterprise Governance</title>
     <style>
         /* Base SaaS Cyber Theme */
-        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 40px; margin: 0; line-height: 1.6;}
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; margin: 0; line-height: 1.6;}
         .container { max-width: 1100px; margin: auto; }
         h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin: 0; }
         
@@ -41,7 +41,7 @@
         .badge { padding: 6px 12px; border-radius: 6px; font-size: 0.75em; font-weight: bold; border: 1px solid; display: inline-flex; align-items: center; gap: 8px; min-width: 170px;}
 
         #notification-container { position: fixed; top: 20px; right: 20px; width: 380px; z-index: 10000; display: flex; flex-direction: column; gap: 12px; }
-        .alert { padding: 16px; border-radius: 8px; border-left: 6px solid; font-size: 0.85em; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .alert { padding: 16px; border-radius: 8px; border-left: 5px solid; font-size: 0.85em; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .alert-success { background: #1a3321; border-color: #238636; color: #4fb35e; }
         .alert-danger { background: #3d1616; border-color: #ff7b72; color: #ff7b72; }
 
@@ -59,7 +59,7 @@
 
     <div id="loading-overlay">
         <div class="scanner-ring"></div>
-        <div class="loading-text">PROTOCOL ACTIVE: SECUSYS ENGINE ANALYZING...</div>
+        <div class="loading-text">SECUSYS ENGINE ANALYZING...</div>
     </div>
 
     <div id="notification-container">
@@ -100,7 +100,6 @@
             </div>
             <div class="widget">
                 <span class="widget-label">Resilience Index</span>
-                <!-- NO ERROR HERE: Logic placed in class, not style -->
                 <span class="widget-value {% if resilience_score > 70 %}status-secure{% else %}status-warning{% endif %}">
                     {{ resilience_score if resilience_score else 0 }}%
                 </span>
@@ -110,12 +109,12 @@
         <div class="control-panel">
             <form action="/scan" method="post" onsubmit="showLoading()">
                 <div class="input-group">
-                    <input type="text" name="target_ip" placeholder="Target Infrastructure Target..." required autofocus>
+                    <input type="text" name="target_ip" placeholder="Search Multiple Targets (e.g. 127.0.0.1, google.com)" required autofocus>
                     <select name="scan_type" id="scan_mode" onchange="togglePorts()">
-                        <option value="test">Rapid Test</option>
-                        <option value="common">Enterprise Audit</option>
-                        <option value="well-known">Systemic Sweep (1-1024)</option>
-                        <option value="custom">Advanced Precision Audit</option>
+                        <option value="test">QuickScan</option>
+                        <option value="common">Common Port Scan</option>
+                        <option value="well-known">Deep Scan (1-1024)</option>
+                        <option value="custom">Custom scan</option>
                     </select>
                     <button type="submit">EXECUTE ENGINE</button>
                 </div>
@@ -154,8 +153,13 @@
                         <tr>
                             <td style="color: #8b949e; font-size: 0.8em;">{{ audit.scan_date.strftime('%Y-%m-%d | %H:%M') }}</td>
                             <td>
-                                <a href="{{ url_for('audit_detail', record_id=audit.id) }}" style="color: #58a6ff; text-decoration: none; font-weight: bold; font-family: monospace;">{{ audit.target_ip }}</a>
-                                <a href="{{ url_for('export_pdf', record_id=audit.id) }}" class="link-text">Export Audit (.PDF)</a>
+                                <!-- STARTUP UPDATE: Asset Lifecycle Timeline Link -->
+                                <a href="/timeline?ip={{ audit.target_ip }}" style="color: #58a6ff; text-decoration: none; font-weight: bold; font-family: monospace; border-bottom: 1px dotted transparent;" onmouseover="this.style.borderBottom='1px dotted #58a6ff'" onmouseout="this.style.borderBottom='none'">
+                                    {{ audit.target_ip }}
+                                </a>
+                                <!-- SUB-NAVIGATION: Specific Point-in-Time detail & PDF -->
+                                <a href="{{ url_for('audit_detail', record_id=audit.id) }}" class="link-text">Details</a>
+                                <a href="{{ url_for('export_pdf', record_id=audit.id) }}" class="link-text">PDF</a>
                             </td>
                             <td>
                                 {% if audit.remediation_status == 1 %}
@@ -218,7 +222,7 @@
             alerts.forEach(alert => {
                 alert.style.transition = "opacity 0.6s ease";
                 alert.style.opacity = "0";
-                setTimeout(() => alert.remove(), 700);
+                setTimeout(() => alert.remove(), 600);
             });
         }, 5000); 
 

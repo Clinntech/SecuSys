@@ -62,7 +62,7 @@ def get_dashboard_hud(uid):
     # 2. Open Compliance Vulnerabilities (Unremediated)
     unresolved_risks = AuditRecord.query.filter_by(user_id=uid, remediation_status=0).filter(AuditRecord.threat_summary.like('%Identified%')).count()
     
-    # 3. NEW: Resilience Index (Global Hardening Average)
+    # 3. Resilience Index (Global Hardening Average)
     all_scores = [s.security_score for s in user_scans if s.security_score is not None]
     resilience = int(sum(all_scores) / len(all_scores)) if all_scores else 0
     
@@ -158,6 +158,7 @@ def logout():
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
+    # Dynamic settings management for different vendor hardware
     cfg = DeviceSettings.query.filter_by(user_id=current_user.id).first()
     if request.method == 'POST':
         ip, usr, pw = request.form.get('device_ip'), request.form.get('ssh_user'), request.form.get('ssh_password')
@@ -175,6 +176,9 @@ def settings():
 @app.route('/scan', methods=['POST'])
 @login_required 
 def scan():
+    """
+    SaaS Batch Engine: Supports multiple target scanning via comma-delimited input.
+    """
     global last_scanned_ip
     # NEW STARTUP LOGIC: Batch Target Parsing (Subnet discovery ready)
     raw_input = request.form.get('target_ip').strip()
@@ -228,14 +232,39 @@ def scan():
             flash(f"SCAN HANDSHAKE FAILED: Asset {target} resolution error.", "danger")
 
     db.session.commit()
-    flash(f"System Check Complete: Hardening session for {len(target_list)} unique targets.", "success")
-
-    # Refresh Dashboard state variables
+    
+    # REFRESH UI VARIABLES
     f_total = AuditRecord.query.count()
     f_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(15).all()
     f_assets, f_risks, f_resilience = get_dashboard_hud(current_user.id)
 
     return render_template('index.html', results=combined_feed, target=raw_input, audit_count=f_total, history=f_logs, assets_count=f_assets, risks_count=f_risks, resilience_score=f_resilience)
+
+# --- TODAY'S UPDATE: ASSET TIMELINE (Lifecycle Logic) ---
+@app.route('/timeline')
+@login_required
+def asset_timeline():
+    """
+    Asset Management Hub: Compiles every historical audit for a specific 
+    unique IP target using query parameter identification (?ip=).
+    """
+    target_ip = request.args.get('ip')
+    
+    if not target_ip:
+        flash("Handshake Violation: Target IP not specified in query.", "danger")
+        return redirect(url_for('index'))
+
+    # Fetch private lifecycle for specific IP
+    history = AuditRecord.query.filter_by(
+        target_ip=target_ip, 
+        user_id=current_user.id
+    ).order_by(AuditRecord.scan_date.desc()).all()
+
+    if not history:
+        flash(f"IDENTIFICATION FAILURE: No telemetry history for asset {target_ip}.", "danger")
+        return redirect(url_for('index'))
+
+    return render_template('asset_timeline.html', ip=target_ip, timeline=history)
 
 @app.route('/audit/<int:record_id>')
 @login_required
@@ -250,8 +279,8 @@ def delete_audit(record_id):
     record = AuditRecord.query.get_or_404(record_id)
     if record.user_id != current_user.id: return redirect(url_for('index'))
     try:
-        db.session.delete(record); db.session.commit(); flash("Audit purged from forensic history.", "success")
-    except: db.session.rollback(); flash("Platform Exception during purge.", "danger")
+        db.session.delete(record); db.session.commit(); flash("Audit purged from history.", "success")
+    except: db.session.rollback(); flash("Fail.", "danger")
     return redirect(url_for('index'))
 
 @app.route('/download')
@@ -292,7 +321,7 @@ def export_inventory():
 @login_required
 def remediate(record_id):
     """
-    Closed-Loop Remediation Logic with Autonomous Verification Handshake
+    Verified Post-Handshake verification loop.
     """
     record = AuditRecord.query.get_or_404(record_id)
     if record.user_id != current_user.id: return redirect(url_for('index'))
@@ -305,34 +334,33 @@ def remediate(record_id):
     p_match = re.findall(r'Port (\d+)', str(record.ports_found))
     target_p = int(p_match[0]) if p_match else 80
     
-    # Multivendor Policy Generator (Handshake Selection)
+    # Multivendor Policy Selection
     if config.device_platform == 'cisco_ios':
         cli = f"access-list 101 deny tcp any any eq {target_p}"
     elif config.device_platform == 'linux':
         cli = f"iptables -A INPUT -p tcp --dport {target_p} -j DROP"
-    else: cli = f"Handshake Default for port {target_p}"
+    else: cli = f"Platform default deny for port {target_p}"
 
     try:
         handshake_fail = scan_port(record.target_ip, target_p)
         if not handshake_fail:
-            record.remediation_status, record.remediation_log = 1, f"VERIFIED: {config.device_platform.upper()} successful block of Port {target_p}."
+            record.remediation_status, record.remediation_log = 1, f"VERIFIED: {config.device_platform.upper()} Handshake blocked port {target_p}."
             db.session.commit(); flash("SYSTEM SUCCESS: Mitigation confirmed by secondary probe.", "success")
         else:
-            record.remediation_log = f"PROTOCOL FAILURE: Port {target_p} remains active on {config.device_platform}."
+            record.remediation_status, record.remediation_log = 0, "ALARM: Policy conflict identified."
             db.session.commit(); flash("SECUSYS WARNING: Policy Handshake Failure.", "danger")
     except: flash("ERROR: Telemetry tunnel interrupted.", "danger")
     return redirect(url_for('index'))
 
 def seed_intelligence():
-    """ Self-Filling Brain migration """
+    """ Database seeding for Well-Known port intelligence """
     with app.app_context():
         if Vulnerability.query.count() < 1000:
-            print("System Readiness Check: Synchronizing SQL knowledge...")
             for p in range(1, 1025):
                 if not Vulnerability.query.filter_by(port=p).first():
                     try: name = socket.getservbyport(p).upper()
-                    except: name = "DYNAMIC-PROFILE"
-                    db.session.add(Vulnerability(port=p, service=name, risk="LOW", description=f"Handshake at {p}", fix="Manual check suggested", cisco_acl=f"access-list 101 deny tcp any any eq {p}"))
+                    except: name = "UNMAPPED"
+                    db.session.add(Vulnerability(port=p, service=name, risk="LOW", description=f"Audit {p}", fix="Review Policy", cisco_acl=f"access-list 101 deny tcp any any eq {p}"))
             db.session.commit()
 
 if __name__ == '__main__':

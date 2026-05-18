@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Asset Lifecycle | {{ ip }}</title>
+    <style>
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, sans-serif; padding: 40px; }
+        .container { max-width: 900px; margin: auto; }
+        h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 15px; }
+        
+        /* The Audit Thread Visuals */
+        .thread { border-left: 2px solid #30363d; margin-left: 20px; padding: 0; list-style: none; }
+        .audit-point { position: relative; padding-left: 30px; margin-bottom: 30px; }
+        .audit-point::before { content: ""; position: absolute; left: -7px; top: 5px; width: 12px; height: 12px; background: #30363d; border: 2px solid #0d1117; border-radius: 50%; }
+        
+        .point-green::before { background: #238636; box-shadow: 0 0 10px #238636; }
+        .point-red::before { background: #f85149; box-shadow: 0 0 10px #f85149; }
+
+        .report-card { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 6px; }
+        .meta-text { color: #8b949e; font-size: 0.8em; margin-bottom: 10px; font-family: monospace;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Infrastructure Integrity Lifecycle</h1>
+        <p style="color: #8b949e; margin-bottom: 40px;">Tracing history for unique asset: <strong style="color:white;">{{ ip }}</strong></p>
+
+        <div class="thread">
+            {% for audit in timeline %}
+            <div class="audit-point {% if audit.remediation_status == 1 %}point-green{% else %}point-red{% endif %}">
+                <div class="report-card">
+                    <div class="meta-text">STAMP: {{ audit.scan_date.strftime('%Y-%m-%d %H:%M') }} UTC</div>
+                    <div>{{ audit.threat_summary }}</div>
+                    <a href="{{ url_for('audit_detail', record_id=audit.id) }}" style="color: #58a6ff; text-decoration: none; font-size: 0.85em; display: inline-block; margin-top: 10px;">[ View Captured Telemetry ]</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <a href="/" style="color: #8b949e; text-decoration: none; font-size: 0.85em;">← Dashboard Master Control</a>
+    </div>
+</body>
+</html>
