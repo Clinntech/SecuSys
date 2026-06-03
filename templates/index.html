@@ -3,216 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecuSys Dashboard | Unified Forensic Governance</title>
+    <title>SecuSys Dashboard | Analytics & Infrastructure</title>
     <style>
         /* Base SaaS Cyber Theme */
-        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; margin: 0; line-height: 1.6;}
-        .container { max-width: 1200px; margin: auto; }
-        h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin: 0; }
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, sans-serif; margin: 0; line-height: 1.6; display: flex; height: 100vh; overflow: hidden;}
         
-        /* Dashboard Nav & Handshake Identifiers */
-        .identity-bar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 25px; }
-        .logout-link { color: #ff7b72; text-decoration: none; font-size: 0.85em; border: 1px solid transparent; padding: 2px 8px; border-radius: 4px; }
-        .logout-link:hover { border: 1px solid #ff7b72; }
+        /* SIDEBAR ENGINE: Smooth sliding transition */
+        #sidebar { 
+            width: 220px; 
+            background: #161b22; 
+            border-right: 1px solid #30363d; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 30px 15px; 
+            flex-shrink: 0;
+            transition: margin-left 0.3s ease-in-out;
+            z-index: 1000;
+        }
 
-        /* Status Tickers */
-        .header-meta { font-family: monospace; font-size: 0.85em; display: flex; gap: 20px; }
-        .sync-active { color: #3fb950; }
-        .sync-warning { color: #ffbb33; }
+        /* Logic for Hiding Sidebar */
+        #sidebar.collapsed { margin-left: -250px; }
 
-        /* Tactical HUD (Heads-Up Display) */
-        .dashboard-widgets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
-        .widget { background: #161b22; border: 1px solid #30363d; padding: 20px; border-radius: 10px; border-top: 3px solid #58a6ff; }
-        .widget.risk { border-top-color: #f85149; }
-        .widget.success { border-top-color: #238636; }
-        .widget-label { color: #8b949e; font-size: 0.65em; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; display: block; margin-bottom: 5px;}
-        .widget-value { color: #f0f6fc; font-size: 1.6em; font-family: monospace; font-weight: bold; }
+        .sidebar-brand { color: #58a6ff; font-weight: bold; font-size: 1.1rem; margin-bottom: 40px; white-space: nowrap;}
+        .nav-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; display: block;}
+        .nav-item { display: block; color: #c9d1d9; text-decoration: none; padding: 10px 0; font-size: 0.9em; transition: 0.2s; white-space: nowrap;}
+        .nav-item:hover { color: #58a6ff; }
         
-        /* Tactical Resilience Colors */
+        /* MAIN VIEWPORT */
+        .main-viewport { flex-grow: 1; overflow-y: auto; padding: 40px 60px; transition: all 0.3s; }
+        .top-nav { display: flex; align-items: center; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin-bottom: 30px; }
+        h1 { color: #58a6ff; margin: 0; font-size: 1.6rem; letter-spacing: -0.5px;}
+
+        /* SIDEBAR TOGGLE BUTTON (ARROWS) */
+        .toggle-btn {
+            background: transparent;
+            border: 1px solid #30363d;
+            color: #58a6ff;
+            cursor: pointer;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 1.2rem;
+            margin-right: 20px;
+        }
+
+        .meta-data { font-family: monospace; font-size: 0.8em; margin-left: auto; display: flex; gap: 15px;}
+
+        /* FIXED: CSS Classes to stop Linter Errors */
         .text-secure { color: #3fb950 !important; }
         .text-warning { color: #ffbb33 !important; }
-
-        /* Scanning Control Deck */
-        .control-panel { background: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 30px; }
-        .input-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        input, select { padding: 12px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; flex: 1; min-width: 220px;}
-        button { padding: 12px 30px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s;}
-        button:hover { background: #2ea043; }
-        #custom-fields { display: none; }
-
-        /* Tables & Lists */
-        table { width: 100%; border-collapse: collapse; margin-top: 5px; background: #161b22; border-radius: 10px; overflow: hidden; }
-        th, td { padding: 15px 20px; text-align: left; border-bottom: 1px solid #30363d; vertical-align: middle; }
-        th { background: #21262d; color: #8b949e; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px;}
-        .artifact-link { color: #58a6ff; text-decoration: none; font-size: 0.72em; border: 1px solid #30363d; padding: 3px 8px; border-radius: 4px; margin-left: 10px; transition: 0.2s;}
-        .artifact-link:hover { border-color: #58a6ff; }
+        .text-danger { color: #ff7b72 !important; }
         
-        .status-badge { padding: 6px 12px; border-radius: 6px; font-size: 0.75em; font-weight: bold; border: 1px solid; display: inline-flex; align-items: center; gap: 8px; min-width: 175px;}
+        .alert-success-bg { background: #1a3321; border-left: 5px solid #238636; color: #4fb35e; }
+        .alert-danger-bg { background: #3d1616; border-left: 5px solid #ff7b72; color: #ff7b72; }
 
-        /* Notification Architecture */
-        #notification-container { position: fixed; top: 20px; right: 20px; width: 400px; z-index: 10000; display: flex; flex-direction: column; gap: 12px; }
-        .alert { padding: 16px; border-radius: 8px; border-left: 6px solid; font-size: 0.85em; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: slideIn 0.4s ease-out; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .alert-success { background: #1a3321; border-color: #238636; color: #4fb35e; }
-        .alert-danger { background: #3d1616; border-color: #ff7b72; color: #ff7b72; }
+        /* Tactical HUD (Metrics) */
+        .dashboard-widgets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 35px; }
+        .widget { background: #161b22; border: 1px solid #30363d; padding: 20px; border-radius: 12px; border-top: 4px solid #58a6ff; }
+        .widget.risk-border { border-top-color: #f85149; }
+        .widget.success-border { border-top-color: #238636; }
 
-        .table-filter { width: 100%; max-width: 450px; padding: 10px 15px; background: #0d1117; border: 1px solid #30363d; font-size: 0.85em; border-radius: 6px; color: white;}
-        .result-box { background: #010409; border: 1px solid #30363d; padding: 20px; border-radius: 6px; margin-top: 15px; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px; color: #d1d5da; }
+        .widget-label { color: #8b949e; font-size: 0.65em; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; display: block;}
+        .widget-value { color: #f0f6fc; font-size: 1.6em; font-family: monospace; font-weight: bold; }
 
-        /* LOADING SYSTEM: Radar Scan Overlay */
+        /* Control UI */
+        .control-panel { background: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 35px; }
+        .input-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        input, select { padding: 12px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; flex: 1; }
+        button { padding: 12px 30px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s;}
+        
+        table { width: 100%; border-collapse: collapse; background: #161b22; border-radius: 12px; overflow: hidden; }
+        th, td { padding: 18px 25px; text-align: left; border-bottom: 1px solid #30363d; }
+        th { background: #21262d; color: #8b949e; font-size: 0.7em; text-transform: uppercase; }
+        
+        .artifact-link { color: #58a6ff; text-decoration: none; font-size: 0.7em; border: 1px solid #30363d; padding: 3px 8px; border-radius: 4px; margin-left: 10px; }
+        .badge { padding: 8px 14px; border-radius: 8px; font-size: 0.75em; font-weight: bold; border: 1px solid; display: inline-flex; align-items: center; gap: 8px; min-width: 170px; }
+
+        /* Floating Overlays */
+        #notification-container { position: fixed; top: 30px; right: 30px; width: 400px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
+        .alert-box { padding: 15px; border-radius: 8px; font-size: 0.85em; box-shadow: 0 10px 40px rgba(0,0,0,0.6); border-left: 5px solid;}
+
         #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13, 17, 23, 0.94); z-index: 20000; justify-content: center; align-items: center; flex-direction: column; }
-        .scanner-ring { width: 80px; height: 80px; border: 4px solid #161b22; border-top: 4px solid #58a6ff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        .scanner-ring { width: 80px; height: 80px; border: 5px solid #161b22; border-top: 5px solid #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 25px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .loading-text { font-family: monospace; letter-spacing: 2px; color: #58a6ff; font-weight: bold; }
+        
+        .result-box { background: #010409; border: 1px solid #30363d; padding: 25px; border-radius: 8px; margin-top: 15px; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px; color: #d1d5da; }
     </style>
 </head>
 <body>
 
-    <!-- PROCESSING OVERLAY -->
+    <!-- OVERLAYS Radar Scanner Animation -->
     <div id="loading-overlay">
         <div class="scanner-ring"></div>
-        <div class="loading-text">RECURSIVE SUBNET EXPANSION ACTIVE: ANALYZING NODES...</div>
+        <div style="font-family: monospace; color:#58a6ff; letter-spacing: 2px;">HANDSHAKE PROTOCOL: ENGINE GATHERING INTELLIGENCE...</div>
     </div>
 
-    <!-- NOTIFICATION SYSTEM -->
+    <!-- NOTIFICATION Hub -->
     <div id="notification-container">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
-              <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} flask-msg">
-                <strong>PROTOCOL STATUS:</strong> {{ message }}
+              <div class="alert-box flask-msg {{ 'alert-success-active alert-success-bg' if category == 'success' else 'alert-danger-active alert-danger-bg' }}">
+                <strong>PROTOCOL ALERT:</strong> {{ message }}
               </div>
             {% endfor %}
           {% endif %}
         {% endwith %}
     </div>
 
-    <div class="container">
-        <!-- Platform Branding & Management Handshake -->
-        <div class="identity-bar">
-            <h1>SecuSys Dashboard <span style="font-size: 0.4em; color: #8b949e;">FOUNDER v3.8 Stable</span></h1>
-            <div class="header-meta">
-                 <!-- TIME_SYNC Status -->
-                 <span class="{% if ntp_data and 'Verified' in ntp_data %}sync-active{% else %}sync-warning{% endif %}">
-                    LOG_INTEGRITY: {{ ntp_data if ntp_data else 'Standalone' }}
+    <!-- SIDEBAR NAV (May 30 Refined Smaller Layout) -->
+    <aside id="sidebar">
+        <div class="sidebar-brand">SecuSys Governance</div>
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <span class="nav-label">Fleet Manager</span>
+                <a href="/" class="nav-item">Core Dashboard</a>
+                <a href="/settings" class="nav-item">Infrastructure Vault</a>
+            </div>
+            <div class="nav-group">
+                <span class="nav-label">Artifacts</span>
+                <a href="/export_inventory" class="nav-item">Inventory Map (.CSV)</a>
+                <a href="/corporate_report" class="nav-item">Governance PDF</a>
+            </div>
+            <div class="nav-group" style="margin-top: auto;">
+                <span class="nav-label">Session Control</span>
+                <span class="nav-item" style="color: #8b949e; cursor: default;">USER: {{ current_user.username }}</span>
+                <a href="/logout" class="nav-item" style="color: #ff7b72;">Log Out System</a>
+            </div>
+        </nav>
+    </aside>
+
+    <main class="main-viewport">
+        <!-- HEADER TOP WITH ARROW TOGGLE -->
+        <div class="top-nav">
+            <button class="toggle-btn" id="sidebarArrow" onclick="toggleSidebar()">&#x2190;</button>
+            <h1>Your Dashboard</h1>
+            
+            <div class="meta-data">
+                 <span class="{% if ntp_data and 'Verified' in ntp_data %}text-secure{% else %}text-warning{% endif %}" style="font-family: monospace; font-size: 0.85em;">
+                    LOG_INTEGRITY: {{ ntp_data if ntp_data else 'Local_Handshake' }}
                  </span> |
-                 <a href="/settings" style="color: #58a6ff; text-decoration: none;">Network Settings</a> | 
-                 Logged in as: <strong style="color: #58a6ff;">{{ current_user.username }}</strong> | 
-                 <a href="/logout" class="logout-link">Terminate Session</a>
+                 <span style="color: #58a6ff; font-family: monospace; font-size: 0.85em;">DB_HANDSHAKE: ACTIVE</span>
             </div>
         </div>
         
-        <!-- DASHBOARD HUD -->
+        <!-- DASHBOARD HUD Widgets Hub -->
         <div class="dashboard-widgets">
+            <div class="widget"><span class="widget-label">Executed Audits</span><span class="widget-value">{{ audit_count }}</span></div>
+            <div class="widget success-border"><span class="widget-label">Asset Identity</span><span class="widget-value">{{ assets_count }}</span></div>
+            <div class="widget risk-border"><span class="widget-label">Active Hazards</span><span class="widget-value">{{ risks_count }}</span></div>
             <div class="widget">
-                <span class="widget-label">Platform Audits Executed</span>
-                <span class="widget-value">{{ audit_count }}</span>
-            </div>
-            <div class="widget success">
-                <span class="widget-label">Managed Asset Index</span>
-                <span class="widget-value">{{ assets_count }}</span>
-            </div>
-            <div class="widget risk">
-                <span class="widget-label">Active Critical Vulnerabilities</span>
-                <span class="widget-value">{{ risks_count }}</span>
-            </div>
-            <div class="widget">
-                <span class="widget-label">Hardening Resilience Index</span>
-                <span class="widget-value {% if resilience_score > 70 %}text-secure{% else %}text-warning{% endif %}">
+                <span class="widget-label">Resilience index</span>
+                <!-- CLEAN CLASS LOGIC -->
+                <span class="widget-value {{ 'text-secure' if resilience_score > 70 else 'text-warning' }}">
                     {{ resilience_score if resilience_score else 0 }}%
                 </span>
             </div>
         </div>
 
-        <!-- CORPORATE MASTER COMPLIANCE REPORT -->
-        <div style="text-align: right; margin-bottom: 25px;">
-            <a href="/corporate_report" style="color: #8b949e; text-decoration: none; font-size: 0.7em; letter-spacing: 1px; border: 1px solid #30363d; padding: 6px 12px; border-radius: 4px; transition: 0.2s;" onmouseover="this.style.color='#58a6ff'; this.style.borderColor='#58a6ff'">
-                GENERATE CORPORATE COMPLIANCE REPORT (MASTER PDF)
-            </a>
-        </div>
-
-        <!-- ENGINE COMMAND DECK -->
+        <!-- COMMAND CONTROL -->
         <div class="control-panel">
             <form action="/scan" method="post" onsubmit="showLoading()">
                 <div class="input-group">
-                    <!-- Updated Placeholder for Subnet/IP -->
-                    <input type="text" name="target_ip" placeholder="IP Address or CIDR Subnet (e.g., 192.168.1.0/29)" required autofocus>
+                    <input type="text" name="target_ip" placeholder="Target Endpoint(s) or CIDR notation..." required autofocus>
                     <select name="scan_type" id="scan_mode" onchange="togglePorts()">
-                        <option value="test">Rapid Asset discovery</option>
-                        <option value="common">Standard Enterprise Audit</option>
-                        <option value="well-known">Deep Forensic Scan (1-1024)</option>
-                        <option value="custom">Manual: Precision Range</option>
+                        <option value="test">Rapid Test Discovery</option>
+                        <option value="common">Compliance Audit (SaaS)</option>
+                        <option value="well-known">Fidelity Scan (1-1024)</option>
+                        <option value="custom">Advanced Precision Audit</option>
                     </select>
-                    <button type="submit">EXECUTE ENGINE</button>
+                    <button type="submit">START</button>
                 </div>
-                <div id="custom-fields" class="input-group">
-                    <input type="number" name="start_port" placeholder="Starting Port">
-                    <input type="number" name="end_port" placeholder="Ending Port">
+                <div id="custom-fields" style="display: none; margin-top: 15px; gap: 10px;">
+                    <input type="number" name="start_port" placeholder="START_SEQ">
+                    <input type="number" name="end_port" placeholder="END_SEQ">
                 </div>
             </form>
         </div>
 
         <div style="margin-top: 50px;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px;">
-                <h3 style="text-transform: uppercase; letter-spacing: 2px; font-size: 0.85em; color: #8b949e; margin: 0;">Forensic Trace History</h3>
-                <a href="/export_inventory" style="color: #8b949e; text-decoration: none; font-size: 0.75em; border: 1px solid #30363d; padding: 6px 12px; border-radius: 4px; transition: 0.2s;" onmouseover="this.style.color='#58a6ff'; this.style.borderColor='#58a6ff'">
-                    GENERATE INVENTORY (CSV)
-                </a>
+            <div style="display: flex; gap: 20px; align-items: baseline; margin-bottom: 25px;">
+                <h3 style="text-transform: uppercase; letter-spacing: 2px; font-size: 0.85em; color: #8b949e; margin: 0;">Forensic Trace History Archive</h3>
+                <input type="text" id="forensicSearch" style="flex-grow:1; padding: 10px 15px; background:#161b22; border: 1px solid #30363d; border-radius: 8px; color: white;" onkeyup="filterTable()" placeholder="🔍 Filter IP endpoints, aliases, or status keywords...">
             </div>
 
-            <div style="display: flex; gap: 15px; align-items: baseline; margin-bottom: 15px;">
-                <input type="text" id="forensicSearch" class="table-filter" onkeyup="filterTable()" placeholder="🔍 Filter results by target or status code...">
-                <span style="font-size: 0.7em; color: #8b949e;">LOG VISIBILITY: <span id="recordCount">0</span> records identified matching current filters.</span>
-            </div>
-
-            <div style="border: 1px solid #30363d; border-radius: 10px; overflow: hidden;">
+            <div style="border: 1px solid #30363d; border-radius: 12px; overflow: hidden;">
                 <table>
                     <thead>
-                        <tr>
-                            <th>DATE (UTC)</th>
-                            <th>TARGET INFRASTRUCTURE</th>
-                            <th>PROTOCOL STATUS</th>
-                            <th style="text-align: right;">OPS ACTION</th>
-                        </tr>
+                        <tr><th>DATE (UTC)</th><th>TARGET INFRASTRUCTURE</th><th>PROTOCOL GOVERNANCE</th><th style="text-align: right;">OPS ACTION</th></tr>
                     </thead>
                     <tbody id="audit-table-body">
                         {% for audit in history %}
                         <tr>
-                            <td style="color: #8b949e; font-size: 0.8em;">{{ audit.scan_date.strftime('%Y-%m-%d | %H:%M') }}</td>
+                            <td style="color: #8b949e; font-size: 0.85em;">{{ audit.scan_date.strftime('%m-%d | %H:%M') }}</td>
                             <td>
-                                <!-- Individual Lifecycle timeline link -->
-                                <a href="/timeline?ip={{ audit.target_ip }}" style="color: #58a6ff; text-decoration: none; font-weight: bold; font-family: monospace; border-bottom: 1px dotted transparent;" onmouseover="this.style.borderBottom='1px dotted #58a6ff'" onmouseout="this.style.borderBottom='none'">
-                                    {{ audit.target_ip }}
+                                <!-- HANDSHAKE DISPLAY: Showing Saved Nicknames/Aliases -->
+                                <a href="/timeline?ip={{ audit.target_ip }}" style="color: #58a6ff; text-decoration: none; font-weight: bold; font-family: monospace;">
+                                    {{ audit.target_ip }} 
+                                    {% if name_map and audit.target_ip in name_map %}
+                                        <span style="color: #8b949e; font-size: 0.85em; font-weight: normal; font-style: italic;">&nbsp; ({{ name_map[audit.target_ip] }})</span>
+                                    {% endif %}
                                 </a>
-                                <a href="{{ url_for('audit_detail', record_id=audit.id) }}" class="artifact-link">Detail</a>
-                                <a href="{{ url_for('export_pdf', record_id=audit.id) }}" class="artifact-link">Report (.PDF)</a>
+                                <a href="{{ url_for('audit_detail', record_id=audit.id) }}" class="artifact-link">DETAIL</a>
                             </td>
                             <td>
                                 {% if audit.remediation_status == 1 %}
-                                    <div class="status-badge" style="background: rgba(88, 166, 255, 0.05); border-color: #58a6ff; color: #58a6ff;">VERIFIED: RESOLVED</div>
-                                
+                                    <div class="badge" style="background: rgba(88, 166, 255, 0.05); border-color: #58a6ff; color: #58a6ff;">VERIFIED: RESOLVED</div>
                                 {% elif "HTTP" in audit.ports_found or "HTTPS" in audit.ports_found %}
-                                    <div class="status-badge" style="background: rgba(139, 148, 158, 0.05); border-color: #8b949e; color: #c9d1d9;">INFO: SERVICE ACCESSIBLE</div>
-                                
+                                    <div class="badge" style="background: rgba(139, 148, 158, 0.05); border-color: #8b949e; color: #c9d1d9;">INFO: OPEN SERVICE</div>
                                 {% elif "Identified" in audit.threat_summary %}
-                                    <div class="status-badge" style="background: rgba(248, 81, 73, 0.05); border-color: #f85149; color: #ff7b72;">DANGER: ACTION REQUIRED</div>
-                                
+                                    <div class="badge" style="background: rgba(248, 81, 73, 0.05); border-color: #f85149; color: #ff7b72;">DANGER: AT RISK</div>
                                 {% else %}
-                                    <div class="status-badge" style="background: rgba(35, 134, 54, 0.05); border-color: #238636; color: #3fb950;">HARDENED</div>
+                                    <div class="badge" style="background: rgba(35, 134, 54, 0.05); border-color: #238636; color: #3fb950;">HARDENED</div>
                                 {% endif %}
                             </td>
-                            <td style="text-align: right; display: flex; gap: 10px; justify-content: flex-end; border-bottom: 0;">
-                                <form action="{{ url_for('delete_audit', record_id=audit.id) }}" method="POST">
-                                    <button type="submit" style="padding: 5px 12px; font-size: 0.7em; background: transparent; color: #ff7b72; border: 1px solid #3d1616; border-radius: 4px; cursor: pointer;" onclick="return confirm('Confirm permanent record deletion?')">PURGE</button>
-                                </form>
-                                {% if audit.remediation_status == 1 %}
-                                    <span style="color: #8b949e; font-family: monospace; font-size: 0.7em;" title="{{ audit.remediation_log }}">STABLE_LOG_ID_{{ audit.id }}</span>
-                                {% elif "Identified" in audit.threat_summary %}
-                                    <form action="{{ url_for('remediate', record_id=audit.id) }}" method="POST">
-                                        <button type="submit" style="padding: 5px 12px; font-size: 0.7em; background:#2ea043; color:white; border:none; border-radius:4px; cursor:pointer;">SECURE</button>
-                                    </form>
-                                {% else %}
-                                    <span style="color: #8b949e; font-size: 0.7em; font-style: italic;">CLEAR_PASSED</span>
+                            <td style="text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+                                <form action="{{ url_for('delete_audit', record_id=audit.id) }}" method="POST"><button type="submit" style="color:#ff7b72; background:none; border:none; cursor:pointer; font-size: 0.75em;" onclick="return confirm('Purge record?')">[PURGE]</button></form>
+                                {% if audit.remediation_status != 1 and "Identified" in audit.threat_summary %}
+                                    <form action="{{ url_for('remediate', record_id=audit.id) }}" method="POST"><button type="submit" style="color:#3fb950; background:none; border:none; cursor:pointer; font-size: 0.75em;">[FIX]</button></form>
                                 {% endif %}
                             </td>
                         </tr>
@@ -223,59 +230,51 @@
         </div>
 
         {% if target %}
-            <div style="margin-top: 50px; border-top: 1px solid #30363d; padding-top: 30px;">
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <h2 style="margin: 0;">Session Stream Feedback: {{ target }}</h2>
-                    {% if results %} <a href="/download" style="color: #58a6ff; text-decoration: none; font-size: 0.85em; border: 1px solid #58a6ff; padding: 3px 12px; border-radius: 5px;">Save Analysis Logic (.TXT)</a> {% endif %}
-                </div>
+            <div style="margin-top: 60px; border-top: 1px solid #30363d; padding-top: 35px;">
+                <h2 style="margin: 0;">Active Telemetry handshaked detail: {{ target }}</h2>
                 {% for report in results %} <div class="result-box">{{ report }}</div> {% endfor %}
             </div>
         {% endif %}
 
-        <!-- Governance Footer -->
-        <div style="margin-top: 100px; padding: 30px 0; border-top: 1px solid #30363d; text-align: center; font-size: 0.75em; color: #8b949e; letter-spacing: 2px;">
-            SECUSYS PLATFORM INFRASTRUCTURE v3.8 Stable | AUDITOR ID: {{ current_user.username.upper() }}
-            <br>
-            PROTOCOL DATA INTEGRITY: VERIFIED SECURE SHA-256 HASHED IDENTITY ENGINE
-        </div>
-
-    </div>
+    </main>
 
     <script>
+        function toggleSidebar() {
+            var sidebar = document.getElementById("sidebar");
+            var button = document.getElementById("sidebarArrow");
+            if (sidebar.className === "") {
+                sidebar.className = "collapsed";
+                button.innerHTML = "&#x2192;"; // Open arrow
+            } else {
+                sidebar.className = "";
+                button.innerHTML = "&#x2190;"; // Close arrow
+            }
+        }
+
         function togglePorts() {
             var mode = document.getElementById("scan_mode").value;
             document.getElementById("custom-fields").style.display = mode === "custom" ? "flex" : "none";
         }
+        
         function showLoading() { document.getElementById("loading-overlay").style.display = "flex"; }
 
-        // Alert Toast dismissal
         setTimeout(function() {
             const alerts = document.querySelectorAll('.flask-msg');
             alerts.forEach(alert => {
-                alert.style.transition = "opacity 0.6s ease, transform 0.6s ease";
+                alert.style.transition = "opacity 0.6s";
                 alert.style.opacity = "0";
-                alert.style.transform = "translateY(-15px)";
-                setTimeout(() => alert.remove(), 700);
+                setTimeout(() => alert.remove(), 600);
             });
-        }, 7000); 
+        }, 6500); 
 
-        // Client-side discovery filter
         function filterTable() {
             let filter = document.getElementById("forensicSearch").value.toUpperCase();
-            let tr = document.getElementById("audit-table-body").getElementsByTagName("tr");
-            let count = 0;
+            let tbody = document.getElementById("audit-table-body");
+            let tr = tbody.getElementsByTagName("tr");
             for (let i = 0; i < tr.length; i++) {
-                let textStr = tr[i].textContent.toUpperCase();
-                if (textStr.indexOf(filter) > -1) {
-                    tr[i].style.display = ""; count++;
-                } else { tr[i].style.display = "none"; }
+                if (tr[i].textContent.toUpperCase().indexOf(filter) > -1) { tr[i].style.display = ""; } else { tr[i].style.display = "none"; }
             }
-            document.getElementById("recordCount").innerText = count;
         }
-
-        window.onload = function() {
-            document.getElementById("recordCount").innerText = document.querySelectorAll("#audit-table-body tr").length;
-        };
     </script>
 </body>
 </html>
