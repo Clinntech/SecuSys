@@ -112,25 +112,33 @@
 
     <!-- SIDEBAR NAV (May 30 Refined Smaller Layout) -->
     <aside id="sidebar">
-        <div class="sidebar-brand">SecuSys Governance</div>
-        <nav class="sidebar-nav">
-            <div class="nav-group">
-                <span class="nav-label">Fleet Manager</span>
-                <a href="/" class="nav-item">Core Dashboard</a>
-                <a href="/settings" class="nav-item">Infrastructure Vault</a>
-            </div>
-            <div class="nav-group">
-                <span class="nav-label">Artifacts</span>
-                <a href="/export_inventory" class="nav-item">Inventory Map (.CSV)</a>
-                <a href="/corporate_report" class="nav-item">Governance PDF</a>
-            </div>
-            <div class="nav-group" style="margin-top: auto;">
-                <span class="nav-label">Session Control</span>
-                <span class="nav-item" style="color: #8b949e; cursor: default;">USER: {{ current_user.username }}</span>
-                <a href="/logout" class="nav-item" style="color: #ff7b72;">Log Out System</a>
-            </div>
-        </nav>
-    </aside>
+    <!-- Brand: Simple and Bold -->
+    <div class="sidebar-brand">SecuSys Dashboard</div>
+    
+    <nav class="sidebar-nav">
+        <div class="nav-group">
+            <span class="nav-label">Main Tools</span>
+            <a href="/" class="nav-item">Home: Overview</a>
+            <!-- NEW: Highly Visible Problem Tracker -->
+            <a href="/incidents" class="nav-item" style="color: #ffbb33;">[ ! ] Fix Pending Issues ({{ risks_count }})</a>  
+            <a href="/settings" class="nav-item">Set Up My Devices</a>
+            <a href="/my-devices" class="nav-item">My Device List</a> 
+        </div>
+
+        <div class="nav-group">
+            <span class="nav-label">Reports & Files</span>
+            <!-- Friendly Shorthand for CSV/PDF -->
+            <a href="/export_inventory" class="nav-item">Download Excel Log</a>
+            <a href="/corporate_report" class="nav-item">Get PDF Report</a>
+        </div>
+
+        <div class="nav-group" style="margin-top: auto;">
+            <span class="nav-label">Logins</span>
+            <span class="nav-item" style="color: #8b949e; cursor: default;">Current User: {{ current_user.username }}</span>
+            <a href="/logout" class="nav-item" style="color: #ff7b72;">Exit SecuSys</a>
+        </div>
+    </nav>
+</aside>
 
     <main class="main-viewport">
         <!-- HEADER TOP WITH ARROW TOGGLE -->

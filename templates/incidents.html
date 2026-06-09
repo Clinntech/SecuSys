@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecuSys | Pending Issues</title>
+    <style>
+        /* Base SaaS Cyber Theme (Synced with Dashboard) */
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, sans-serif; margin: 0; line-height: 1.6; display: flex; height: 100vh; overflow: hidden;}
+        
+        .sidebar { width: 220px; background: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; padding: 30px 15px; flex-shrink: 0; }
+        .sidebar-brand { color: #58a6ff; font-weight: bold; font-size: 1.1rem; margin-bottom: 40px; white-space: nowrap;}
+        .nav-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; display: block;}
+        .nav-item { display: block; color: #c9d1d9; text-decoration: none; padding: 8px 0; font-size: 0.9em; transition: 0.2s;}
+        .nav-item:hover { color: #58a6ff; }
+
+        .main-viewport { flex-grow: 1; overflow-y: auto; padding: 40px 60px; }
+        h1 { color: #ffbb33; margin: 0; font-size: 1.6rem; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin-bottom: 30px;}
+        
+        /* Incident Card Styles */
+        .incident-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 25px; margin-bottom: 20px; border-left: 5px solid #f85149; position: relative;}
+        .incident-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 15px;}
+        .target-name { color: #f0f6fc; font-weight: bold; font-family: monospace; font-size: 1.1em;}
+        .time-stamp { color: #8b949e; font-size: 0.8em; font-family: monospace;}
+        
+        .summary-box { background: #010409; padding: 15px; border-radius: 6px; font-size: 0.9em; color: #d1d5da; margin-bottom: 20px;}
+        
+        /* The Action Area */
+        .action-bar { border-top: 1px solid #30363d; padding-top: 15px; display: flex; justify-content: space-between; align-items: center;}
+        .fix-button { background: #238636; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85em; transition: 0.3s;}
+        .fix-button:hover { background: #2ea043; }
+        .view-link { color: #58a6ff; text-decoration: none; font-size: 0.85em; }
+        
+        /* Empty State */
+        .empty-state { text-align: center; padding: 100px 0; color: #8b949e;}
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR NAV -->
+    <aside id="sidebar" class="sidebar">
+        <div class="sidebar-brand">SecuSys Dashboard</div>
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <span class="nav-label">Main Tools</span>
+                <a href="/" class="nav-item">Home: Overview</a>
+                <a href="/incidents" class="nav-item" style="color: #ffbb33; font-weight: bold;">
+                    [ ! ] Fix Pending Issues ({{ count }})
+                </a>
+                <a href="/settings" class="nav-item">Set Up My Devices</a>
+            </div>
+
+            <div class="nav-group">
+                <span class="nav-label">Reports & Files</span>
+                <a href="/export_inventory" class="nav-item">Download Excel Log</a>
+                <a href="/corporate_report" class="nav-item">Get PDF Report</a>
+            </div>
+
+            <div class="nav-group" style="margin-top: auto;">
+                <span class="nav-label">Logins</span>
+                <span class="nav-item" style="color: #8b949e; cursor: default;">Current User: {{ current_user.username }}</span>
+                <a href="/logout" class="nav-item" style="color: #ff7b72;">Exit SecuSys</a>
+            </div>
+        </nav>
+    </aside>
+
+    <main class="main-viewport">
+        <h1>Your Remediation Queue</h1>
+        <p style="margin-bottom: 40px; color: #8b949e;">The following infrastructure items have active vulnerabilities. Deploy fixes below to clear your security queue.</p>
+
+        {% if incidents %}
+            {% for incident in incidents %}
+            <div class="incident-card">
+                <div class="incident-header">
+                    <span class="target-name">TARGET INFRASTRUCTURE: {{ incident.target_ip }}</span>
+                    <span class="time-stamp">Detected: {{ incident.scan_date.strftime('%Y-%m-%d %H:%M') }} UTC</span>
+                </div>
+
+                <div class="summary-box">
+                    REPORTED FINDING: {{ incident.threat_summary }}
+                </div>
+
+                <div class="action-bar">
+                    <a href="/audit/{{ incident.id }}" class="view-link">Open Full Forensic File &rarr;</a>
+                    
+                    <!-- ACTION TRIGGER: Talks to your remediate logic in app.py -->
+                    <form action="{{ url_for('remediate', record_id=incident.id) }}" method="POST">
+                        <button type="submit" class="fix-button">EXECUTE SYSTEM FIX</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <!-- Victory State: No work to do! -->
+            <div class="empty-state">
+                <div style="font-size: 3em; margin-bottom: 20px;">🛡️</div>
+                <h3>Your network is clear!</h3>
+                <p>No pending security incidents found in your audit history.</p>
+                <a href="/" class="view-link" style="font-size: 1.1em;">Back to Dashboard to start a new scan</a>
+            </div>
+        {% endif %}
+
+    </main>
+
+</body>
+</html>

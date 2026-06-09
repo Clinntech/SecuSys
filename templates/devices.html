@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SecuSys | My Device List</title>
+    <style>
+        /* Base SaaS Cyber Theme */
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; margin: 0; }
+        
+        /* SIDEBAR (Synced with Dash) */
+        .sidebar { width: 220px; background: #161b22; border-right: 1px solid #30363d; padding: 30px 15px; flex-shrink: 0; }
+        .sidebar-brand { color: #58a6ff; font-weight: bold; margin-bottom: 40px; font-size: 1.1rem; }
+        .nav-item { display: block; color: #c9d1d9; text-decoration: none; padding: 10px 0; font-size: 0.9em; transition: 0.2s;}
+        .nav-item:hover { color: #58a6ff; }
+        
+        .main-viewport { flex-grow: 1; padding: 40px 60px; overflow-y: auto; }
+        h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin-bottom: 30px;}
+        
+        /* Device Card Layout */
+        .device-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 25px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; transition: 0.3s; }
+        .device-card:hover { border-color: #58a6ff; }
+        
+        .nickname { color: #f0f6fc; font-weight: bold; font-size: 1.1em; display: block; margin-bottom: 5px;}
+        .ip-address { font-family: monospace; color: #8b949e; font-size: 0.9em; }
+        
+        .platform-tag { font-size: 0.7em; background: rgba(88, 166, 255, 0.1); padding: 4px 10px; border-radius: 4px; color: #58a6ff; border: 1px solid #58a6ff; margin-right: 15px; font-weight: bold;}
+        
+        /* Tactical Action Button */
+        .audit-btn { 
+            background: transparent; 
+            color: #3fb950; 
+            border: 1px solid #238636; 
+            padding: 8px 16px; 
+            border-radius: 6px; 
+            font-size: 0.8em; 
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .audit-btn:hover { background: #238636; color: white; }
+
+        /* LOADING SYSTEM: Radar Scan Overlay */
+        #loading-overlay { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(13, 17, 23, 0.95); z-index: 20000; 
+            justify-content: center; align-items: center; flex-direction: column; 
+        }
+        .scanner-ring { 
+            width: 80px; height: 80px; border: 5px solid #161b22; border-top: 5px solid #58a6ff; 
+            border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 25px; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { font-family: monospace; letter-spacing: 2px; color: #58a6ff; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <!-- ASYNC PROCESSING OVERLAY -->
+    <div id="loading-overlay">
+        <div class="scanner-ring"></div>
+        <div class="loading-text">PROTOCOL: INITIATING MANAGED HANDSHAKE...</div>
+    </div>
+
+    <aside class="sidebar">
+        <div class="sidebar-brand">SecuSys Ops</div>
+        <nav>
+            <a href="/" class="nav-item">Dashboard Home</a>
+            <a href="/my-devices" class="nav-item" style="color: #58a6ff;">Managed Infrastructure</a>
+            <a href="/settings" class="nav-item">+ Onboard New Gear</a>
+            <hr style="border: 0; border-top: 1px solid #30363d; margin: 20px 0;">
+            <a href="/logout" class="nav-item" style="color: #ff7b72;">Kill Active Session</a>
+        </nav>
+    </aside>
+
+    <main class="main-viewport">
+        <h1>Infrastructure Inventory</h1>
+        <p style="margin-bottom: 40px; color: #8b949e;">Unified list of your registered network assets. Select "Begin Audit" to start real-time telemetry extraction.</p>
+
+        {% if devices %}
+            {% for device in devices %}
+            <div class="device-card">
+                <div>
+                    <span class="nickname">{{ device.device_name }}</span>
+                    <span class="ip-address">STATIC_NODE: {{ device.device_ip }}</span>
+                </div>
+                
+                <div style="display: flex; align-items: center;">
+                    <span class="platform-tag">{{ device.device_platform.upper() }}</span>
+                    
+                    <!-- NEW STARTUP ACTION: THE ENGINE BRIDGE -->
+                    <form action="/scan" method="POST" style="margin: 0;" onsubmit="showLoading()">
+                        <!-- Secret Handshake: Sending database info to the scanner engine -->
+                        <input type="hidden" name="target_ip" value="{{ device.device_ip }}">
+                        <input type="hidden" name="scan_type" value="common">
+                        <button type="submit" class="audit-btn">BEGIN AUDIT</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="text-align: center; margin-top: 80px; color: #8b949e;">
+                <p style="font-size: 1.1em;">Asset Inventory Empty.</p>
+                <a href="/settings" class="audit-btn" style="text-decoration: none; display: inline-block; margin-top: 20px; border-color: #58a6ff; color: #58a6ff;">Register Primary Hardware</a>
+            </div>
+        {% endif %}
+    </main>
+
+    <script>
+        // Trigger for visual radar feedback
+        function showLoading() {
+            document.getElementById("loading-overlay").style.display = "flex";
+        }
+    </script>
+</body>
+</html>

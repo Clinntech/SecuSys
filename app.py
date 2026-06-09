@@ -127,9 +127,9 @@ class DeviceSettings(db.Model):
     device_ip = db.Column(db.String(50), nullable=False)
     device_name = db.Column(db.String(100), default="Primary Interface")
     ssh_user = db.Column(db.String(100), nullable=False)
-    ssh_password = db.Column(db.String(255), nullable=False) 
+    ssh_password = db.Column(db.String(255), nullable=False)
     device_platform = db.Column(db.String(50), default='cisco_ios')
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 # Application persistence logic
 last_scanned_ip = ""
@@ -181,25 +181,51 @@ def logout():
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
-    cfg = DeviceSettings.query.filter_by(user_id=current_user.id).first()
+    """
+    SaaS Infrastructure Onboarding: Allows the auditor to add 
+    unique named assets to their secure inventory vault.
+    """
     if request.method == 'POST':
-        # Asset Handshake Aliasing
+        # 1. CATCH the new human-readable Asset Name/Alias
         alias = request.form.get('device_name')
-        ip, usr, pw = request.form.get('device_ip'), request.form.get('ssh_user'), request.form.get('ssh_password')
+        
+        # 2. Catch the technical connection metadata
+        ip = request.form.get('device_ip')
+        usr = request.form.get('ssh_user')
+        pw = request.form.get('ssh_password')
         plat = request.form.get('device_platform') 
+        
+        # 3. SECURITY: Protect the asset management password via Hashing
         h_pw = bcrypt.generate_password_hash(pw).decode('utf-8')
-        if cfg:
-            cfg.device_name = alias
-            cfg.device_ip, cfg.ssh_user, cfg.ssh_password, cfg.device_platform = ip, usr, h_pw, plat
-        else:
-            db.session.add(DeviceSettings(
-                device_name=alias, device_ip=ip, ssh_user=usr, 
-                ssh_password=h_pw, device_platform=plat, user_id=current_user.id
-            ))
-        db.session.commit()
-        flash(f"Infrastructure Mapping successfully finalized: {alias}.", "success")
-        return redirect(url_for('index'))
-    return render_template('settings.html', config=cfg)
+
+        # 4. STARTUP GROWTH LOGIC: Always create a NEW record. 
+        # This allows the user to have 10, 50, or 100 devices.
+        try:
+            new_asset = DeviceSettings(
+                device_name=alias, 
+                device_ip=ip, 
+                ssh_user=usr, 
+                ssh_password=h_pw, 
+                device_platform=plat, 
+                user_id=current_user.id # Link to the person logged in
+            )
+            
+            db.session.add(new_asset)
+            db.session.commit()
+            
+            print(f"[INVENTORY] Successfully onboarded asset: {alias} ({ip})")
+            flash(f"Handshake Successful: {alias} has been added to your inventory list.", "success")
+            
+            # Redirect to the inventory list to see the new device card
+            return redirect(url_for('my_devices')) 
+
+        except Exception as e:
+            db.session.rollback()
+            flash("VAULT ERROR: Infrastructure collision detected or database busy.", "danger")
+            return redirect(url_for('index'))
+
+    # If it is a GET request, just show the empty 'Add' form
+    return render_template('settings.html')
 
 @app.route('/scan', methods=['POST'])
 @login_required 
@@ -323,6 +349,25 @@ def audit_detail(record_id):
     if record.user_id != current_user.id: return redirect(url_for('index'))
     return render_template('audit_detail.html', audit=record)
 
+@app.route('/incidents')
+@login_required
+def incident_hub():
+    """
+    SaaS Command Logic: Aggregates all detected but unremediated threats 
+    into a prioritized Operational Task List for the Auditor.
+    """
+    # 1. Fetch only scans where remediation_status is 0 (Not fixed) 
+    # AND findings were actually identified.
+    active_incidents = AuditRecord.query.filter_by(
+        user_id=current_user.id, 
+        remediation_status=0
+    ).filter(AuditRecord.threat_summary.like('%Identified%')).order_by(AuditRecord.scan_date.desc()).all()
+
+    # 2. Extract metrics for the hub
+    incident_count = len(active_incidents)
+    
+    return render_template('incidents.html', incidents=active_incidents, count=incident_count)
+
 @app.route('/delete_audit/<int:record_id>', methods=['POST'])
 @login_required
 def delete_audit(record_id):
@@ -383,6 +428,17 @@ def remediate(record_id):
         else: flash("Handshake responsive: Policy failure.", "danger")
     except: flash("Tunnel interrupted.", "danger")
     return redirect(url_for('index'))
+
+@app.route('/my-devices')
+@login_required
+def my_devices():
+    """
+    Inventory Hub: Lists every piece of infrastructure the user has 
+    registered with a custom nickname.
+    """
+    # Fetch the full inventory for the logged-in user
+    inventory = DeviceSettings.query.filter_by(user_id=current_user.id).all()
+    return render_template('devices.html', devices=inventory)
 
 # --- HYBRID INTELLIGENCE BRAIN (PACKETLIFE V5.0 INTEGRATED) ---
 def seed_intelligence():

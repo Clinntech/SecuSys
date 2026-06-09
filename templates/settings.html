@@ -24,7 +24,15 @@
                 <option value="linux" {% if config and config.device_platform == 'linux' %}selected{% endif %}>Linux Firewalls (iptables)</option>
                 <option value="juniper_junos" {% if config and config.device_platform == 'juniper_junos' %}selected{% endif %}>Juniper Junos OS</option>
             </select>
-
+            <!-- NEW: Device Naming Logic -->
+            <label style="display: block; font-size: 0.8rem; color: #8b949e; margin-bottom: 5px; text-transform: uppercase;">
+                Friendly Asset Name
+            </label>
+            <input type="text" 
+            name="device_name" 
+            placeholder="e.g. Headquarters Router or Finance Server" 
+            style="width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; box-sizing: border-box;" 
+            required>
             <label>Infrastructure Target IP (Auditor Bridge)</label>
             <input type="text" name="device_ip" value="{{ config.device_ip if config else '' }}" placeholder="IP or Hostname" required>
             
