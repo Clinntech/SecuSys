@@ -95,25 +95,27 @@
         <nav class="sidebar-nav">
             <div class="nav-group">
                 <span class="nav-label">Main Tools</span>
-                <a href="/" class="nav-item">Dashboard Home</a>
+                <a href="/" class="nav-item">Home</a>
 
                 <!-- DYNAMIC UPDATED ITEM: Status Aware Pending Count -->
                 <a href="/incidents" class="nav-item {% if risks_count > 0 %}nav-at-risk{% else %}nav-safe{% endif %}">
-                    Fix Pending Issues: {{ risks_count if risks_count else 0 }}
+                Pending Issues: {{ risks_count if risks_count else 0 }}
                 </a>
 
-                <a href="/my-devices" class="nav-item">Device Assets</a>
-                <a href="/settings" class="nav-item">Register New Gear</a>
+                <a href="/my-devices" class="nav-item">Devices</a>
+                <a href="/settings" class="nav-item">New Device</a>
             </div>
             <div class="nav-group">
-                <span class="nav-label">Data Manifests</span>
-                <a href="/export_inventory" class="nav-item">Inventory CSV</a>
-                <a href="/corporate_report" class="nav-item">Audit PDF</a>
+                <span class="nav-label"> </span>
+                <span class="nav-label"> </span>
+                <span class="nav-label">Downloads</span>
+                <a href="/export_inventory" class="nav-item">Scanned IP's</a>
+                <a href="/corporate_report" class="nav-item">Download Log</a>
             </div>
             <div class="nav-group" style="margin-top: auto; padding-top: 40px;">
                 <span class="nav-label">Platform Profile</span>
-                <span class="nav-item" style="color: #8b949e; cursor: default;">USER: {{ current_user.username }}</span>
-                <a href="/logout" class="nav-item" style="color: #ff7b72;">Kill Engine Session</a>
+                <span class="nav-item" style="color: #104e61; cursor: default;">Logged in as: {{ current_user.username }}</span>
+                <a href="/logout" class="nav-item" style="color: #ff7b72;">Log Out</a>
             </div>
         </nav>
     </aside>

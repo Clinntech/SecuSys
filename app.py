@@ -302,7 +302,7 @@ def corporate_report():
     elements.append(t)
     doc.build(elements)
     buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name="Enterprise_Forensic_Inventory.pdf", mimetype='application/pdf')
+    return send_file(buffer, as_attachment=True, download_name="Scan Log.pdf", mimetype='application/pdf')
 
 @app.route('/timeline')
 @login_required
@@ -364,7 +364,7 @@ def export_inventory():
     writer.writerow(['RecordID', 'Target', 'Time_UTC', 'Strength'])
     for r in records: writer.writerow([r.id, r.target_ip, r.scan_date, f"{r.security_score}%"])
     mem = io.BytesIO(); mem.write(buffer.getvalue().encode('utf-8')); mem.seek(0)
-    return send_file(mem, as_attachment=True, download_name="Managed_Assets.csv", mimetype='text/csv')
+    return send_file(mem, as_attachment=True, download_name="Scanned IPs.csv", mimetype='text/csv')
 
 @app.route('/remediate/<int:record_id>', methods=['POST'])
 @login_required
