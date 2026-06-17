@@ -145,12 +145,15 @@ def load_user(user_id):
 def index():
     audit_total = AuditRecord.query.count()
     user_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(15).all()
+
+    #Fetch the saved devices 
+    inventory_list = DeviceSettings.query.filter_by(user_id=current_user.id).all()
     # LOAD TAC-HUD with full asset name-mapping
     asset_id, hazards, resilience, names = get_dashboard_hud_data(current_user.id)
     ntp = check_ntp_status()
     return render_template('index.html', audit_count=audit_total, history=user_logs, 
                            assets_count=asset_id, risks_count=hazards, resilience_score=resilience, 
-                           ntp_data=ntp, name_map=names)
+                           ntp_data=ntp, name_map=names, inventory=inventory_list)
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -159,7 +162,7 @@ def signup():
         hashed = bcrypt.generate_password_hash(pw).decode('utf-8')
         db.session.add(User(username=name, password=hashed))
         db.session.commit()
-        flash("SYSTEM: Account Enrollment Successful.", "success")
+        flash("SYSTEM: Account Enrollment Successful. Proceed to login.", "success")
         return redirect(url_for('login')) 
     return render_template('signup.html')
 
@@ -181,50 +184,22 @@ def logout():
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
-    """
-    SaaS Infrastructure Onboarding: Allows the auditor to add 
-    unique named assets to their secure inventory vault.
-    """
     if request.method == 'POST':
-        # 1. CATCH the new human-readable Asset Name/Alias
+        # Asset Handshake Onboarding
         alias = request.form.get('device_name')
-        
-        # 2. Catch the technical connection metadata
-        ip = request.form.get('device_ip')
-        usr = request.form.get('ssh_user')
-        pw = request.form.get('ssh_password')
+        ip, usr, pw = request.form.get('device_ip'), request.form.get('ssh_user'), request.form.get('ssh_password')
         plat = request.form.get('device_platform') 
-        
-        # 3. SECURITY: Protect the asset management password via Hashing
         h_pw = bcrypt.generate_password_hash(pw).decode('utf-8')
-
-        # 4. STARTUP GROWTH LOGIC: Always create a NEW record. 
-        # This allows the user to have 10, 50, or 100 devices.
-        try:
-            new_asset = DeviceSettings(
-                device_name=alias, 
-                device_ip=ip, 
-                ssh_user=usr, 
-                ssh_password=h_pw, 
-                device_platform=plat, 
-                user_id=current_user.id # Link to the person logged in
-            )
-            
-            db.session.add(new_asset)
-            db.session.commit()
-            
-            print(f"[INVENTORY] Successfully onboarded asset: {alias} ({ip})")
-            flash(f"Handshake Successful: {alias} has been added to your inventory list.", "success")
-            
-            # Redirect to the inventory list to see the new device card
-            return redirect(url_for('my_devices')) 
-
-        except Exception as e:
-            db.session.rollback()
-            flash("VAULT ERROR: Infrastructure collision detected or database busy.", "danger")
-            return redirect(url_for('index'))
-
-    # If it is a GET request, just show the empty 'Add' form
+        
+        # Adding new unique named asset to registry
+        db.session.add(DeviceSettings(
+            device_name=alias, device_ip=ip, ssh_user=usr, 
+            ssh_password=h_pw, device_platform=plat, user_id=current_user.id
+        ))
+        db.session.commit()
+        flash(f"HANDSHAKE SUCCESSFUL: Asset {alias} has been added to inventory.", "success")
+        return redirect(url_for('my_devices'))
+        
     return render_template('settings.html')
 
 @app.route('/scan', methods=['POST'])
@@ -240,10 +215,9 @@ def scan():
     target_list = []
     
     for t in initial_list:
-        if "/" in t: # Identifies CIDR Subnet Architecture
+        if "/" in t: # Subnet Expansion Detection
             try:
                 network = ipaddress.IPv4Network(t, strict=False)
-                # Founder Constraint: Auto-detecting host limit of 32 nodes
                 target_list.extend([str(ip) for ip in list(network.hosts())[:32]])
             except: target_list.append(t)
         else: target_list.append(t)
@@ -280,16 +254,15 @@ def scan():
             db.session.add(AuditRecord(
                 target_ip=target,
                 ports_found="\n".join(results), 
-                threat_summary=f"Audit Success: Identified {len(results)} vulnerabilities." if results else "Hardened.",
+                threat_summary=f"Audit Success: Identified {len(results)} vulnerabilities." if results else "State Hardened.",
                 user_id=current_user.id,
                 security_score=h_score
             ))
             if results: save_report_to_file(ip, results)
             combined_feed.extend(results)
-        except Exception: flash(f"Handshake resolution fail: {target}", "danger")
+        except Exception: flash(f"SCAN HANDSHAKE FAILED: Asset {target} resolution failed.", "danger")
 
     db.session.commit()
-    flash(f"Forensic process finalized. Scoped infrastructure health analyzed.", "success")
     
     f_total = AuditRecord.query.count()
     f_logs = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).limit(15).all()
@@ -300,28 +273,25 @@ def scan():
                            history=f_logs, assets_count=asset_id, risks_count=hazards, 
                            resilience_score=resilience, ntp_data=ntp, name_map=names)
 
-# --- REFACTORED COMPLIANCE PDF LOGIC ---
 @app.route('/corporate_report')
 @login_required
 def corporate_report():
-    """ Professional Executive Summary: Intelligently categorizes intended web services. """
     records = AuditRecord.query.filter_by(user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).all()
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     elements = []
     
-    data = [['DATE (UTC)', 'INFRASTRUCTURE', 'COMPLIANCE STATUS', 'HEALTH INDEX']]
+    data = [['DATE (UTC)', 'INFRASTRUCTURE', 'COMPLIANCE STATUS', 'HARDENING %']]
     for r in records:
         if r.remediation_status == 1: state = "FIXED/VERIFIED"
         elif "Identified" in r.threat_summary:
-            # Context-Aware categorizing: Differentiates legitimate site accessibility from risk.
             if ("Port 80" in str(r.ports_found) or "Port 443" in str(r.ports_found)) and "CRITICAL" not in str(r.ports_found):
                 state = "SERVICE ACCESSIBLE"
             else: state = "AT RISK"
         else: state = "SECURE/HARDENED"
         data.append([r.scan_date.strftime('%Y-%m-%d'), r.target_ip, state, f"{r.security_score}%"])
 
-    t = Table(data, colWidths=[110, 180, 140, 80])
+    t = Table(data, colWidths=[100, 160, 140, 80])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#30363d")),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -332,12 +302,11 @@ def corporate_report():
     elements.append(t)
     doc.build(elements)
     buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name="SaaS Compliance Dashboard Archive.pdf", mimetype='application/pdf')
+    return send_file(buffer, as_attachment=True, download_name="Enterprise_Forensic_Inventory.pdf", mimetype='application/pdf')
 
 @app.route('/timeline')
 @login_required
 def asset_timeline():
-    """ Trace IP History Thread """
     ip = request.args.get('ip')
     history = AuditRecord.query.filter_by(target_ip=ip, user_id=current_user.id).order_by(AuditRecord.scan_date.desc()).all()
     return render_template('asset_timeline.html', ip=ip, timeline=history)
@@ -352,29 +321,19 @@ def audit_detail(record_id):
 @app.route('/incidents')
 @login_required
 def incident_hub():
-    """
-    SaaS Command Logic: Aggregates all detected but unremediated threats 
-    into a prioritized Operational Task List for the Auditor.
-    """
-    # 1. Fetch only scans where remediation_status is 0 (Not fixed) 
-    # AND findings were actually identified.
+    """ Central Command: Resolves hazards and tracks compliance drift. """
     active_incidents = AuditRecord.query.filter_by(
-        user_id=current_user.id, 
-        remediation_status=0
+        user_id=current_user.id, remediation_status=0
     ).filter(AuditRecord.threat_summary.like('%Identified%')).order_by(AuditRecord.scan_date.desc()).all()
-
-    # 2. Extract metrics for the hub
-    incident_count = len(active_incidents)
     
-    return render_template('incidents.html', incidents=active_incidents, count=incident_count)
+    return render_template('incidents.html', incidents=active_incidents, count=len(active_incidents))
 
 @app.route('/delete_audit/<int:record_id>', methods=['POST'])
 @login_required
 def delete_audit(record_id):
-    """ Forensic Purge logic. """
     record = AuditRecord.query.get_or_404(record_id)
     if record.user_id == current_user.id:
-        db.session.delete(record); db.session.commit(); flash("Log artifact purged.", "success")
+        db.session.delete(record); db.session.commit(); flash("Handshake telemetry purged.", "success")
     return redirect(url_for('index'))
 
 @app.route('/download')
@@ -382,7 +341,7 @@ def delete_audit(record_id):
 def download():
     filename = f"scan_report_{last_scanned_ip.replace('.', '_')}.txt"
     if os.path.exists(filename): return send_file(filename, as_attachment=True)
-    return "<h3>404: Trace Artifact not identified in session cache.</h3>"
+    return "<h3>Artifact expired.</h3>"
 
 @app.route('/export_pdf/<int:record_id>')
 @login_required
@@ -392,7 +351,7 @@ def export_pdf(record_id):
     buffer = io.BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     p.setFont("Helvetica-Bold", 20); p.drawString(100, 750, "SECUSYS FORENSIC REPORT")
-    p.setFont("Helvetica", 12); p.drawString(100, 700, f"TARGET ASSET: {record.target_ip}")
+    p.setFont("Helvetica", 12); p.drawString(100, 700, f"TARGET: {record.target_ip}")
     p.drawString(100, 680, f"INTEGRITY LEVEL: {record.security_score}%")
     p.showPage(); p.save(); buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name=f"Report_{record.target_ip}.pdf", mimetype='application/pdf')
@@ -402,76 +361,52 @@ def export_pdf(record_id):
 def export_inventory():
     records = AuditRecord.query.filter_by(user_id=current_user.id).all()
     buffer = io.StringIO(); writer = csv.writer(buffer)
-    writer.writerow(['RecordID', 'Infrastructure_Target', 'Timestamp_UTC', 'HealthIndex'])
+    writer.writerow(['RecordID', 'Target', 'Time_UTC', 'Strength'])
     for r in records: writer.writerow([r.id, r.target_ip, r.scan_date, f"{r.security_score}%"])
     mem = io.BytesIO(); mem.write(buffer.getvalue().encode('utf-8')); mem.seek(0)
-    return send_file(mem, as_attachment=True, download_name="SaaS Infrastructure Map.csv", mimetype='text/csv')
+    return send_file(mem, as_attachment=True, download_name="Managed_Assets.csv", mimetype='text/csv')
 
 @app.route('/remediate/<int:record_id>', methods=['POST'])
 @login_required
 def remediate(record_id):
-    """ Post-Deployment autonomous verification handshake. """
     record = AuditRecord.query.get_or_404(record_id)
     if record.user_id != current_user.id: return redirect(url_for('index'))
     config = DeviceSettings.query.filter_by(user_id=current_user.id).first()
-    if not config: flash("Settings Required.", "danger"); return redirect(url_for('index'))
+    if not config: flash("Credentials Missing.", "danger"); return redirect(url_for('index'))
     p_match = re.findall(r'Port (\d+)', str(record.ports_found))
     target_p = int(p_match[0]) if p_match else 80
     if config.device_platform == 'cisco_ios': cli = f"access-list 101 deny tcp any any eq {target_p}"
     elif config.device_platform == 'linux': cli = f"iptables -A INPUT -p tcp --dport {target_p} -j DROP"
-    else: cli = f"Blocking port {target_p}"
+    else: cli = f"Deny {target_p}"
     try:
-        active, _ = scan_port(record.target_ip, target_p)
-        if not active:
-            record.remediation_status, record.remediation_log = 1, f"VERIFIED: Policy pushed on {config.device_name}. Access Restricted."
-            db.session.commit(); flash("Mitigation successfully verified via secondary handshake.", "success")
-        else: flash("Handshake responsive: Policy failure.", "danger")
-    except: flash("Tunnel interrupted.", "danger")
+        status, banner = scan_port(record.target_ip, target_p)
+        if not status:
+            record.remediation_status, record.remediation_log = 1, f"VERIFIED: Policy deployed. Port {target_p} blocked."
+            db.session.commit(); flash("Verification Success.", "success")
+        else:
+            record.remediation_log = f"ALARM: Policy conflict."; db.session.commit(); flash("Handshake Alert.", "danger")
+    except: flash("ERROR: Handshake Interrupted.", "danger")
     return redirect(url_for('index'))
 
-@app.route('/my-devices')
+@app.route('/my-devices', methods=['GET', 'POST'])
 @login_required
 def my_devices():
-    """
-    Inventory Hub: Lists every piece of infrastructure the user has 
-    registered with a custom nickname.
-    """
-    # Fetch the full inventory for the logged-in user
+    """ Manage and onboard private infrastructure assets. """
     inventory = DeviceSettings.query.filter_by(user_id=current_user.id).all()
-    return render_template('devices.html', devices=inventory)
+    # Calculating Sidebar state for unified nav
+    _, hazards, _, _ = get_dashboard_hud_data(current_user.id)
+    return render_template('devices.html', devices=inventory, risks_count=hazards)
 
-# --- HYBRID INTELLIGENCE BRAIN (PACKETLIFE V5.0 INTEGRATED) ---
 def seed_intelligence():
-    """ 
-    Enterprise Logic Seeding: Combined Malware Vectors and Corporate Service catalog.
-    Maintains text-based text-only forensic themes. 
-    """
+    """ Logic Intelligence v5.0 Active (1,024 Port Handshakes) """
     with app.app_context():
-        # Executive Malicious/Enterprise Map (PRIORITY INTELLIGENCE)
-        extended_brain = {
-            21:  ["FTP", "HIGH", "Plaintext logins; risk of MITM sniffing.", "Enforce move to SFTP.", "access-list 101 deny tcp any any eq 21"],
-            22:  ["SSH", "SAFE", "Secure Shell encrypted tunnel.", "Verify modern ciphers.", "access-list 101 permit tcp any any eq 22"],
-            23:  ["TELNET", "CRITICAL", "Legacy cleartext management.", "Disable immediately; switch to SSH.", "access-list 101 deny tcp any any eq 23"],
-            80:  ["HTTP", "ACCESSIBLE", "Standard web port; intended accessibility.", "Force 443 redirects.", "access-list 101 permit tcp [TRUSTED_IP] any eq 80"],
-            443: ["HTTPS", "SAFE", "Standard TLS encrypted secure web.", "Monitor Certs.", "access-list 101 permit tcp any any eq 443"],
-            445: ["SMB-MS", "CRITICAL", "Active Windows fileshare; high Ransomware risk.", "Block WAN traversal.", "access-list 101 deny tcp any any eq 445"],
-            3306:["MYSQL", "HIGH", "Exposed Database port.", "Limit access to app-nodes only.", "access-list 101 deny tcp any any eq 3306"],
-            12345:["NETBUS", "CRITICAL", "Legacy Trojan vector.", "Emergency Block.", "access-list 101 deny tcp any any eq 12345"],
-            31337:["BACK-ORIFICE","CRITICAL","Classic Malware Backdoor.", "Hard isolation required.", "access-list 101 deny tcp any any eq 31337"]
-        }
         if Vulnerability.query.count() < 1000:
-            print("System Readiness Check: Synchronizing Forensic Intel...")
             for p in range(1, 1025):
                 if not Vulnerability.query.filter_by(port=p).first():
-                    if p in extended_brain:
-                        e = extended_brain[p]
-                        s, r, d, f, c = e[0], e[1], e[2], e[3], e[4]
-                    else:
-                        try: nm = socket.getservbyport(p).upper()
-                        except: nm = "PORT-MAPPED"
-                        s, r, d, f, c = nm, "LOW", f"Standard port node associated with {nm}.", "Baseline Policy Audit.", f"access-list 101 deny tcp any any eq {p}"
-                    db.session.add(Vulnerability(port=p, service=s, risk=r, description=d, fix=f, cisco_acl=c))
-            db.session.commit(); print("[READY] Logic Intelligence v5.0 Active.")
+                    try: nm = socket.getservbyport(p).upper()
+                    except: nm = "DYNAMIC-PROFILE"
+                    db.session.add(Vulnerability(port=p, service=nm, risk="LOW", description=f"Handshake Logic for port {p}", fix="Manual hardhening advised.", cisco_acl=f"access-list 101 deny tcp any any eq {p}"))
+            db.session.commit()
 
 if __name__ == '__main__':
     with app.app_context(): db.create_all()
