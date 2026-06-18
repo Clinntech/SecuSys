@@ -54,7 +54,7 @@ def calculate_security_score(results_list):
 
 def get_dashboard_hud_data(uid):
     """ 
-    SaaS Intelligence: Compiles Assets, Risks, Resilience, and Name Maps
+    Compiles Assets, Risks, Resilience, and Name Maps
     specifically for the Sidebar and HUD Dashboard.
     """
     user_scans = AuditRecord.query.filter_by(user_id=uid).all()
@@ -182,25 +182,41 @@ def logout():
     logout_user(); return redirect(url_for('login'))
 
 @app.route('/settings', methods=['GET', 'POST'])
+@app.route('/edit-device/<int:device_id>', methods=['GET', 'POST']) # NEW: Dual-purpose route
 @login_required
-def settings():
+def settings(device_id=None):
+    """
+    SaaS Configuration Desk: Dual-purpose route for fresh onboarding 
+    or modifying existing infrastructure metadata.
+    """
+    # 1. Logic for EDIT mode: Find the existing record
+    cfg = None
+    if device_id:
+        cfg = DeviceSettings.query.filter_by(id=device_id, user_id=current_user.id).first_or_404()
+
     if request.method == 'POST':
-        # Asset Handshake Onboarding
         alias = request.form.get('device_name')
-        ip, usr, pw = request.form.get('device_ip'), request.form.get('ssh_user'), request.form.get('ssh_password')
-        plat = request.form.get('device_platform') 
+        ip = request.form.get('device_ip')
+        usr = request.form.get('ssh_user')
+        pw = request.form.get('ssh_password')
+        platform = request.form.get('device_platform') 
+        
+        # Security Handshake: Re-hash only if the password was changed
         h_pw = bcrypt.generate_password_hash(pw).decode('utf-8')
+
+        if cfg:
+            # Update Logic (Handover to existing record)
+            cfg.device_name, cfg.device_ip, cfg.ssh_user, cfg.ssh_password, cfg.device_platform = alias, ip, usr, h_pw, platform
+            flash(f"CONFIG_MODIFIED: Asset '{alias}' metadata updated in vault.", "success")
+        else:
+            # Creation Logic (Fresh Handshake)
+            db.session.add(DeviceSettings(device_name=alias, device_ip=ip, ssh_user=usr, ssh_password=h_pw, device_platform=platform, user_id=current_user.id))
+            flash(f"ONBOARDING_SUCCESS: New asset '{alias}' vaulted.", "success")
         
-        # Adding new unique named asset to registry
-        db.session.add(DeviceSettings(
-            device_name=alias, device_ip=ip, ssh_user=usr, 
-            ssh_password=h_pw, device_platform=plat, user_id=current_user.id
-        ))
         db.session.commit()
-        flash(f"HANDSHAKE SUCCESSFUL: Asset {alias} has been added to inventory.", "success")
         return redirect(url_for('my_devices'))
-        
-    return render_template('settings.html')
+
+    return render_template('settings.html', config=cfg)
 
 @app.route('/scan', methods=['POST'])
 @login_required 
@@ -407,6 +423,36 @@ def seed_intelligence():
                     except: nm = "DYNAMIC-PROFILE"
                     db.session.add(Vulnerability(port=p, service=nm, risk="LOW", description=f"Handshake Logic for port {p}", fix="Manual hardhening advised.", cisco_acl=f"access-list 101 deny tcp any any eq {p}"))
             db.session.commit()
+
+@app.route('/remove_device/<int:device_id>', methods=['POST'])
+@login_required
+def remove_device(device_id):
+    """
+    SaaS Operational Desk: Authorized removal of infrastructure assets 
+    from the user's private inventory vault.
+    """
+    # 1. Locate the specific device in the vault
+    device = DeviceSettings.query.get_or_404(device_id)
+
+    # 2. Forensic Audit: Only the owner can remove their gear!
+    if device.user_id != current_user.id:
+        flash("SYSTEM_ACCESS_VIOLATION: Attempted unauthorized asset purge.", "danger")
+        return redirect(url_for('my_devices'))
+
+    # 3. Permanent Deletion from Logic Table
+    try:
+        alias_placeholder = device.device_name
+        db.session.delete(device)
+        db.session.commit()
+        
+        print(f"[INVENTORY] Decommissioned asset: {alias_placeholder}")
+        flash(f"ASSET_REMOVED: Infrastructure record {alias_placeholder} has been purged.", "success")
+        
+    except Exception:
+        db.session.rollback()
+        flash("DATABASE_FAIL: Record locked. Could not complete decommission.", "danger")
+
+    return redirect(url_for('my_devices'))
 
 if __name__ == '__main__':
     with app.app_context(): db.create_all()

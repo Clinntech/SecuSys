@@ -75,7 +75,7 @@
 
     <div id="loading-overlay">
         <div class="scanner-ring"></div>
-        <div style="font-family: monospace; color:#58a6ff;">SECUSYS_ENGINE: GATHERING TELEMETRY...</div>
+        <div style="font-family: monospace; color:#58a6ff;">Finding open ports in device...</div>
     </div>
 
     <div id="notification-container">
@@ -99,7 +99,7 @@
 
                 <!-- DYNAMIC UPDATED ITEM: Status Aware Pending Count -->
                 <a href="/incidents" class="nav-item {% if risks_count > 0 %}nav-at-risk{% else %}nav-safe{% endif %}">
-                Pending Issues: {{ risks_count if risks_count else 0 }}
+                Risks: {{ risks_count if risks_count else 0 }}
                 </a>
 
                 <a href="/my-devices" class="nav-item">Devices</a>
@@ -110,7 +110,7 @@
                 <span class="nav-label"> </span>
                 <span class="nav-label">Downloads</span>
                 <a href="/export_inventory" class="nav-item">Scanned IP's</a>
-                <a href="/corporate_report" class="nav-item">Download Log</a>
+                <a href="/corporate_report" class="nav-item">Logs</a>
             </div>
             <div class="nav-group" style="margin-top: auto; padding-top: 40px;">
                 <span class="nav-label">Platform Profile</span>
@@ -135,8 +135,8 @@
         
         <div class="dashboard-widgets">
             <div class="widget"><span class="widget-label">Platform Scans</span><span class="widget-value">{{ audit_count }}</span></div>
-            <div class="widget border-success"><span class="widget-label">Unique IPs Managed</span><span class="widget-value">{{ assets_count }}</span></div>
-            <div class="widget border-risk"><span class="widget-label">Risk Handshakes</span><span class="widget-value">{{ risks_count }}</span></div>
+            <div class="widget border-success"><span class="widget-label">IPs Scanned</span><span class="widget-value">{{ assets_count }}</span></div>
+            <div class="widget border-risk"><span class="widget-label">Open Ports</span><span class="widget-value">{{ risks_count }}</span></div>
             <div class="widget">
                 <span class="widget-label">Global Hardening Index</span>
                 <span class="widget-value {{ 'color-secure' if resilience_score > 70 else 'color-warning' }}">
@@ -155,7 +155,7 @@
                         <option value="well-known">System Sweep (1-1024)</option>
                         <option value="custom">Advanced Precision manual range</option>
                     </select>
-                    <button type="submit">EXECUTE</button>
+                    <button type="submit">Scan Ports</button>
                 </div>
                 <div id="custom-fields" style="display: none; margin-top: 15px; gap: 10px;">
                     <input type="number" name="start_port" placeholder="START_SEQ">
@@ -217,9 +217,9 @@
                                 {% endif %}
                             </td>
                             <td style="text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
-                                <form action="{{ url_for('delete_audit', record_id=audit.id) }}" method="POST"><button type="submit" style="color:#ff7b72; background:none; border:none; cursor:pointer; font-size: 0.75em;" onclick="return confirm('Purge audit data?')">[PURGE]</button></form>
+                                <form action="{{ url_for('delete_audit', record_id=audit.id) }}" method="POST"><button type="submit" style="color:#ff7b72; background:none; border:none; cursor:pointer; font-size: 0.75em;" onclick="return confirm('Do you want to delete this scan? Yes, Click OK, No Click Cancel.')">DELETE</button></form>
                                 {% if audit.remediation_status != 1 and "Identified" in audit.threat_summary %}
-                                    <form action="{{ url_for('remediate', record_id=audit.id) }}" method="POST"><button type="submit" style="color:#3fb950; background:none; border:none; cursor:pointer; font-size: 0.75em;">[REMEDIATE]</button></form>
+                                    <form action="{{ url_for('remediate', record_id=audit.id) }}" method="POST"><button type="submit" style="color:#3fb950; background:none; border:none; cursor:pointer; font-size: 0.75em;">FIX</button></form>
                                 {% endif %}
                             </td>
                         </tr>

@@ -64,16 +64,16 @@
     <aside class="sidebar">
         <div class="sidebar-brand">SecuSys Ops</div>
         <nav>
-            <a href="/" class="nav-item">Dashboard Home</a>
-            <a href="/my-devices" class="nav-item" style="color: #58a6ff;">Managed Infrastructure</a>
-            <a href="/settings" class="nav-item">+ Onboard New Gear</a>
+            <a href="/" class="nav-item">Home</a>
+            <a href="/my-devices" class="nav-item" style="color: #58a6ff;">Devices</a>
+            <a href="/settings" class="nav-item">+ Add New Device</a>
             <hr style="border: 0; border-top: 1px solid #30363d; margin: 20px 0;">
-            <a href="/logout" class="nav-item" style="color: #ff7b72;">Kill Active Session</a>
+            <a href="/logout" class="nav-item" style="color: #ff7b72;">Log Out</a>
         </nav>
     </aside>
 
     <main class="main-viewport">
-        <h1>Infrastructure Inventory</h1>
+        <h1>Devices & Systems</h1>
         <p style="margin-bottom: 40px; color: #8b949e;">Unified list of your registered network assets. Select "Begin Audit" to start real-time telemetry extraction.</p>
 
         {% if devices %}
@@ -84,16 +84,32 @@
                     <span class="ip-address">STATIC_NODE: {{ device.device_ip }}</span>
                 </div>
                 
-                <div style="display: flex; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
                     <span class="platform-tag">{{ device.device_platform.upper() }}</span>
+                    <!-- This sends the auditor back to the vault settings with this specific ID -->
+
+                    <a href="{{ url_for('settings', device_id=device.id) }}" 
+                        style="color: #8b949e; text-decoration: none; font-size: 0.8em; border: 1px solid #30363d; padding: 7px 14px; border-radius: 6px; transition: 0.2s;"
+                        onmouseover="this.style.color='#58a6ff'; this.style.borderColor='#58a6ff'"
+                        onmouseout="this.style.color='#8b949e'; this.style.borderColor='#30363d'">
+                    MODIFY
+                    </a>
                     
                     <!-- NEW STARTUP ACTION: THE ENGINE BRIDGE -->
                     <form action="/scan" method="POST" style="margin: 0;" onsubmit="showLoading()">
                         <!-- Secret Handshake: Sending database info to the scanner engine -->
                         <input type="hidden" name="target_ip" value="{{ device.device_ip }}">
                         <input type="hidden" name="scan_type" value="common">
-                        <button type="submit" class="audit-btn">BEGIN AUDIT</button>
+                        <button type="submit" class="audit-btn">SCAN</button>
                     </form>
+                            
+                   <form action="{{ url_for('remove_device', device_id=device.id) }}" method="POST" style="margin: 0;">
+                        <button type="submit" 
+                        style="background: transparent; color: #ff7b72; border: 1px solid #5c1d1d; padding: 8px 16px; border-radius: 6px; font-size: 0.8em; cursor: pointer; transition: 0.2s;"
+                        onclick="return confirm('PROTOCOL_WARNING: You are about to permanently remove this device/site. Proceed?')">
+                        DELETE
+                        </button>
+                    </form> 
                 </div>
             </div>
             {% endfor %}
