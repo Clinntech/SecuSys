@@ -83,7 +83,7 @@
           {% if messages %}
             {% for category, message in messages %}
               <div class="alert-toast flask-msg {{ 'success-toast' if category == 'success' else 'danger-toast' }}">
-                PROTOCOL_MSG: {{ message }}
+                {{ message }}
               </div>
             {% endfor %}
           {% endif %}
@@ -150,10 +150,10 @@
                 <div class="input-group">
                     <input type="text" name="target_ip" placeholder="Target Endpoint IP(s) or CIDR Range..." required autofocus>
                     <select name="scan_type" id="scan_mode" onchange="togglePorts()">
-                        <option value="test">Rapid Test Discovery</option>
-                        <option value="common">Standard Industry Audit</option>
-                        <option value="well-known">System Sweep (1-1024)</option>
-                        <option value="custom">Advanced Precision manual range</option>
+                        <option value="test">Quick Scan</option>
+                        <option value="common">Scan</option>
+                        <option value="well-known">Deep Scan(1-1024)</option>
+                        <option value="custom">Select Range</option>
                     </select>
                     <button type="submit">Scan Ports</button>
                 </div>

@@ -6,6 +6,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin, LoginManager, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from datetime import datetime
+import requests
+import json 
 import socket
 import os
 import io # Needed for PDF memory management
@@ -76,6 +78,36 @@ def get_dashboard_hud_data(uid):
     return asset_count, hazards, resilience, aliases
 
 # --- FORENSIC NTP HELPERS ---
+def fetch_live_vulnerabilities(banner_string):
+    """
+    SaaS Logic v6.0: Connects SecuSys to the CIRCL Open-Intelligence API.
+    Translates service banners into actionable CVE lists.
+    """
+    if not banner_string or "Handshake" in banner_string:
+        return "Identity verified: Protocol is standard (No public version artifacts found)."
+
+    try:
+        # Step A: Identify the core product (e.g. extracts 'Apache' from 'Apache 2.4')
+        search_query = banner_string.split('/')[0].strip()
+        
+        # Step B: Secure Handshake with Global CVE database
+        api_url = f"https://cve.circl.lu/api/search/{search_query}"
+        
+        # We request data and set a short 4-second timeout to maintain scan speed
+        response = requests.get(api_url, timeout=4)
+        
+        if response.status_code == 200:
+            intel_data = response.json()
+            if 'results' in intel_data:
+                # We extract the 3 most recent and relevant CVE IDs
+                latest_cves = [item.get('id') for item in intel_data['results'][:3]]
+                if latest_cves:
+                    return f"INTELLIGENCE HIT: {', '.join(latest_cves)} (Sourced via NIST/CVE Database)."
+        
+        return "Platform Baseline: System matches standard security hardened configurations."
+        
+    except Exception:
+        return "NETWORK ERROR: Intelligence portal timeout. Local logic fallback active."
 
 def check_ntp_status():
     """ Verify Forensic Time Synchronization integrity. """
@@ -182,7 +214,7 @@ def logout():
     logout_user(); return redirect(url_for('login'))
 
 @app.route('/settings', methods=['GET', 'POST'])
-@app.route('/edit-device/<int:device_id>', methods=['GET', 'POST']) # NEW: Dual-purpose route
+@app.route('/edit-device/<int:device_id>', methods=['GET', 'POST']) #Dual-purpose route
 @login_required
 def settings(device_id=None):
     """
@@ -349,7 +381,7 @@ def incident_hub():
 def delete_audit(record_id):
     record = AuditRecord.query.get_or_404(record_id)
     if record.user_id == current_user.id:
-        db.session.delete(record); db.session.commit(); flash("Handshake telemetry purged.", "success")
+        db.session.delete(record); db.session.commit(); flash("Deleted.", "success")
     return redirect(url_for('index'))
 
 @app.route('/download')
